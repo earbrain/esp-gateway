@@ -1,6 +1,1 @@
-idf_component_register(
-    SRCS
-        "src/gateway.cpp"
-    INCLUDE_DIRS
-        "include"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/esp_gateway_component.cmake")

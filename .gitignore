@@ -2,3 +2,21 @@
 
 # PlatformIO
 .pio/
+
+# Local virtual environments
+.venv/
+
+# Local direnv config
+.envrc
+.direnv/
+
+# Build outputs
+build/
+**/build/
+
+# Auto-generated lock files
+dependencies.lock
+
+# ESP-IDF configuration files
+sdkconfig
+sdkconfig.old
