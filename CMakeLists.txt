@@ -6,8 +6,9 @@ idf_component_register(
         "src/wifi_softap.cpp"
     INCLUDE_DIRS
         "include"
-    PRIV_REQUIRES
+    REQUIRES
         esp_http_server
+    PRIV_REQUIRES
         esp_netif
         esp_event
         esp_wifi
