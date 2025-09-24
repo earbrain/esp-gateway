@@ -1,1 +1,8 @@
-include("${CMAKE_CURRENT_LIST_DIR}/cmake/esp_gateway_component.cmake")
+cmake_minimum_required(VERSION 3.16)
+
+idf_component_register(
+    SRCS
+        "src/gateway.cpp"
+    INCLUDE_DIRS
+        "include"
+)
