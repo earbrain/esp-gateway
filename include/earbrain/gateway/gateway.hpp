@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <string_view>
-
 #include "esp_err.h"
 #include "esp_http_server.h"
 
@@ -26,6 +25,8 @@ private:
   esp_err_t start_softap();
   esp_err_t start_http_server();
   static esp_err_t handle_root_get(httpd_req_t *req);
+  static esp_err_t handle_app_js_get(httpd_req_t *req);
+  static esp_err_t handle_assets_css_get(httpd_req_t *req);
   char softap_ssid[33];
   std::size_t softap_ssid_len;
   esp_netif_obj *softap_netif;

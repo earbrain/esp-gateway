@@ -1,5 +1,6 @@
 #include "earbrain/gateway/gateway.hpp"
 
+#include <cstdint>
 #include <cstring>
 
 #include "esp_event.h"
@@ -9,9 +10,48 @@
 #include "esp_wifi_default.h"
 #include "nvs_flash.h"
 
+extern "C" {
+extern const uint8_t _binary_index_html_start[];
+extern const uint8_t _binary_index_html_end[];
+extern const uint8_t _binary_app_js_start[];
+extern const uint8_t _binary_app_js_end[];
+extern const uint8_t _binary_index_css_start[];
+extern const uint8_t _binary_index_css_end[];
+}
+
 namespace earbrain {
 
 using namespace std::string_view_literals;
+
+static constexpr auto html_content_type = "text/html; charset=utf-8";
+static constexpr auto js_content_type = "application/javascript";
+static constexpr auto css_content_type = "text/css";
+
+constexpr const uint8_t *truncate_null_terminator(const uint8_t *begin,
+                                                  const uint8_t *end) {
+    return (begin != end && *(end - 1) == '\0') ? end - 1 : end;
+}
+
+static esp_err_t send_embedded(httpd_req_t *req, const uint8_t *begin,
+                               const uint8_t *end) {
+    end = truncate_null_terminator(begin, end);
+    static constexpr size_t chunk_size = 1024;
+    size_t remaining = static_cast<size_t>(end - begin);
+    const uint8_t *cursor = begin;
+
+    while (remaining > 0) {
+        const size_t to_send = remaining > chunk_size ? chunk_size : remaining;
+        const esp_err_t err = httpd_resp_send_chunk(
+            req, reinterpret_cast<const char *>(cursor), to_send);
+        if (err != ESP_OK) {
+            return err;
+        }
+        cursor += to_send;
+        remaining -= to_send;
+    }
+
+    return httpd_resp_send_chunk(req, nullptr, 0);
+}
 
 Gateway::Gateway()
     : softap_ssid{}, softap_ssid_len(0), softap_netif(nullptr),
@@ -141,36 +181,65 @@ esp_err_t Gateway::start_http_server() {
         return err;
     }
 
-    httpd_uri_t root{};
-    root.uri = "/";
-    root.method = HTTP_GET;
-    root.handler = &Gateway::handle_root_get;
-    root.user_ctx = this;
-
-    err = httpd_register_uri_handler(http_server, &root);
+    static httpd_uri_t root_uri_handler = {
+        .uri = "/",
+        .method = HTTP_GET,
+        .handler = &Gateway::handle_root_get,
+        .user_ctx = nullptr,
+    };
+    root_uri_handler.user_ctx = this;
+    err = httpd_register_uri_handler(http_server, &root_uri_handler);
     if (err != ESP_OK) {
         httpd_stop(http_server);
         http_server = nullptr;
+    }
+
+    if (err == ESP_OK) {
+        static httpd_uri_t app_js_uri_handler = {
+            .uri = "/app.js",
+            .method = HTTP_GET,
+            .handler = &Gateway::handle_app_js_get,
+            .user_ctx = nullptr,
+        };
+        app_js_uri_handler.user_ctx = this;
+        err = httpd_register_uri_handler(http_server, &app_js_uri_handler);
+    }
+
+    if (err == ESP_OK) {
+        static httpd_uri_t css_uri_handler = {
+            .uri = "/assets/index.css",
+            .method = HTTP_GET,
+            .handler = &Gateway::handle_assets_css_get,
+            .user_ctx = nullptr,
+        };
+        css_uri_handler.user_ctx = this;
+        err = httpd_register_uri_handler(http_server, &css_uri_handler);
     }
 
     return err;
 }
 
 esp_err_t Gateway::handle_root_get(httpd_req_t *req) {
-    static constexpr char portal_page_html[] = R"PORTAL(
-<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ESP Gateway</title>
-</head><body>
-<div class="wrapper">
-  <h1>ESP Gateway</h1>
-  <p>Hello World</p>
-</div>
-</body></html>)PORTAL";
     (void)static_cast<Gateway *>(req->user_ctx);
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_set_type(req, html_content_type);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    return httpd_resp_send(req, portal_page_html, HTTPD_RESP_USE_STRLEN);
+    return send_embedded(req, ::_binary_index_html_start,
+                         ::_binary_index_html_end);
+}
+
+esp_err_t Gateway::handle_app_js_get(httpd_req_t *req) {
+    (void)static_cast<Gateway *>(req->user_ctx);
+    httpd_resp_set_type(req, js_content_type);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return send_embedded(req, ::_binary_app_js_start, ::_binary_app_js_end);
+}
+
+esp_err_t Gateway::handle_assets_css_get(httpd_req_t *req) {
+    (void)static_cast<Gateway *>(req->user_ctx);
+    httpd_resp_set_type(req, css_content_type);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return send_embedded(req, ::_binary_index_css_start,
+                         ::_binary_index_css_end);
 }
 
 void Gateway::set_softap_ssid(std::string_view ssid) {
