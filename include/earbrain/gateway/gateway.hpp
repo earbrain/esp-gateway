@@ -3,12 +3,14 @@
 namespace earbrain {
 
 class Gateway {
- public:
+public:
   Gateway();
   ~Gateway();
 
   void start();
   void stop();
+
+  const char *version() const { return "0.0.0"; }
 };
 
-}  // namespace earbrain
+} // namespace earbrain

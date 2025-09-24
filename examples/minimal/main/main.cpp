@@ -6,6 +6,8 @@ extern "C" void app_main(void) {
 
   earbrain::Gateway gateway;
 
+  ESP_LOGI(TAG, "Gateway version: %s", gateway.version());
+
   ESP_LOGI(TAG, "Gateway start");
   gateway.start();
 
