@@ -8,5 +8,12 @@ export default defineConfig({
     sourcemap: false,
     assetsDir: ".",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        entryFileNames: "app.js",
+        chunkFileNames: "chunk-[name].js",
+        assetFileNames: "assets/[name][extname]",
+      },
+    },
   },
 });
