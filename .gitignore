@@ -16,7 +16,6 @@ build/
 **/.cache/
 compile_commands.json
 **/node_modules/
-portal/dist/
 
 # Auto-generated lock files
 dependencies.lock
