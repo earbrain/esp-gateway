@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cstddef>
-#include <string_view>
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include <cstddef>
+#include <string_view>
 
 struct esp_netif_obj;
 
@@ -28,6 +28,9 @@ private:
   static esp_err_t handle_app_js_get(httpd_req_t *req);
   static esp_err_t handle_assets_css_get(httpd_req_t *req);
   static esp_err_t handle_device_info_get(httpd_req_t *req);
+  static esp_err_t handle_wifi_credentials_post(httpd_req_t *req);
+  esp_err_t save_wifi_credentials(std::string_view ssid,
+                                  std::string_view passphrase);
   char softap_ssid[33];
   std::size_t softap_ssid_len;
   esp_netif_obj *softap_netif;
