@@ -1,191 +1,156 @@
-import { useEffect, useState } from "preact/hooks";
+import Router, { route, type RouterOnChangeArgs } from "preact-router";
+import { useEffect, useRef, useState } from "preact/hooks";
 
-type DeviceInfo = {
-  model: string;
-  firmware_version: string;
-  build_time: string;
-  idf_version: string;
+import { BreadcrumbSection, type PageMeta } from "./components/breadcrumb";
+import { HomePage } from "./pages/home";
+import { DevicePage } from "./pages/device";
+import { WifiPage } from "./pages/wifi";
+
+type NavItem = {
+  path: string;
+  label: string;
+};
+
+const navItems: NavItem[] = [
+  { path: "/", label: "Home" },
+  { path: "/device", label: "Device" },
+  { path: "/wifi", label: "Wi-Fi" },
+];
+
+const normalizeUrl = (url: string) => {
+  if (!url) {
+    return "/";
+  }
+  const [path] = url.split("?");
+  if (path.length > 1 && path.endsWith("/")) {
+    return path.slice(0, -1);
+  }
+  return path || "/";
+};
+
+const pageMetaMap: Record<string, PageMeta> = {
+  "/device": {
+    showHeader: true,
+    title: "Device",
+    description: "View device details",
+    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Device" }],
+  },
+  "/wifi": {
+    showHeader: true,
+    title: "Wi-Fi",
+    description: "Update Wi-Fi credentials",
+    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Wi-Fi" }],
+  },
+};
+
+const defaultMeta: PageMeta = {
+  showHeader: false,
+  title: "",
+  description: "",
+  breadcrumbs: [],
 };
 
 export function App() {
-  const [info, setInfo] = useState<DeviceInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [ssid, setSsid] = useState("");
-  const [passphrase, setPassphrase] = useState("");
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [currentUrl, setCurrentUrl] = useState<string>(() =>
+    typeof window !== "undefined" ? window.location.pathname : "/",
+  );
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchDeviceInfo = async () => {
-      try {
-        const response = await fetch("/api/v1/device-info", {
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`request failed: ${response.status}`);
-        }
-        const json: DeviceInfo = await response.json();
-        setInfo(json);
-        setError(null);
-      } catch (err) {
-        if ((err as DOMException).name === "AbortError") {
-          return;
-        }
-        console.error(err);
-        setError("Failed to load device information.");
+    const handleClick = (event: MouseEvent) => {
+      if (
+        menuRef.current &&
+        event.target instanceof Node &&
+        !menuRef.current.contains(event.target)
+      ) {
+        setMenuOpen(false);
       }
     };
 
-    fetchDeviceInfo();
-    return () => controller.abort();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("click", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("click", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
-  const handleSubmit = async (event: Event) => {
-    event.preventDefault();
-    if (submitting) {
-      return;
-    }
-    setSubmitError(null);
-    setSubmitSuccess(null);
-
-    if (!ssid.trim()) {
-      setSubmitError("Please enter an SSID.");
-      return;
-    }
-    if (passphrase.length < 8 || passphrase.length > 63) {
-      setSubmitError("Password must be 8-63 characters.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const response = await fetch("/api/v1/wifi/credentials", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ssid: ssid.trim(),
-          passphrase,
-        }),
-      });
-
-      if (!response.ok) {
-        const json = await response.json().catch(() => null);
-        if (json && typeof json.message === "string") {
-          throw new Error(json.message);
-        }
-        throw new Error(`request failed: ${response.status}`);
-      }
-
-      const json: { restart_required?: boolean } = await response.json();
-      if (json.restart_required) {
-        setSubmitSuccess("Saved credentials. Restart is required.");
-      } else {
-        setSubmitSuccess("Saved credentials.");
-      }
-    } catch (err) {
-      console.error(err);
-      setSubmitError(
-        err instanceof Error ? err.message : "Failed to save credentials.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
+  const handleRouteChange = (event: RouterOnChangeArgs) => {
+    setCurrentUrl(normalizeUrl(event.url ?? "/"));
+    setMenuOpen(false);
   };
 
+  const navigate = (path: string) => {
+    route(path);
+    setMenuOpen(false);
+  };
+
+  const normalizedUrl = normalizeUrl(currentUrl);
+  const pageMeta = pageMetaMap[normalizedUrl] ?? defaultMeta;
+
   return (
-    <main class="w-full max-w-md rounded-xl border border-black/10 bg-white p-8 shadow-sm">
-      <h1 class="mb-6 text-center text-2xl font-semibold text-slate-900">
-        ESP Gateway
-      </h1>
-
-      {error && (
-        <p class="mb-6 text-center text-sm font-medium text-red-600">{error}</p>
-      )}
-
-      {info ? (
-        <dl class="grid gap-3 text-sm text-slate-700">
-          <div class="flex items-center justify-between gap-4">
-            <dt class="font-semibold text-slate-600">Model</dt>
-            <dd>{info.model}</dd>
-          </div>
-          <div class="flex items-center justify-between gap-4">
-            <dt class="font-semibold text-slate-600">Firmware</dt>
-            <dd>{info.firmware_version}</dd>
-          </div>
-          <div class="flex items-center justify-between gap-4">
-            <dt class="font-semibold text-slate-600">Build Time</dt>
-            <dd>{info.build_time}</dd>
-          </div>
-          <div class="flex items-center justify-between gap-4">
-            <dt class="font-semibold text-slate-600">ESP-IDF</dt>
-            <dd>{info.idf_version}</dd>
-          </div>
-        </dl>
-      ) : (
-        !error && (
-          <p class="mb-6 text-center text-sm text-slate-500">Loading…</p>
-        )
-      )}
-
-      <section class="mt-8 border-t border-slate-200 pt-6">
-        <h2 class="mb-4 text-lg font-semibold text-slate-900">Configure Wi-Fi</h2>
-        <form class="grid gap-4" onSubmit={handleSubmit}>
-          <label class="flex flex-col gap-2 text-sm font-medium text-slate-700">
-            <span>SSID</span>
-            <input
-              type="text"
-              value={ssid}
-              onInput={(event) => {
-                const target = event.currentTarget;
-                if (target instanceof HTMLInputElement) {
-                  setSsid(target.value);
-                }
+    <div class="min-h-screen bg-slate-100 text-slate-900">
+      <header class="bg-white/95 shadow-sm">
+        <div class="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-4">
+          <h1 class="text-xl font-semibold text-slate-900">ESP Gateway</h1>
+          <nav class="relative" ref={menuRef}>
+            <button
+              type="button"
+              class="menu-toggle"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              aria-label="Open navigation"
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen((prev) => !prev);
               }}
-              placeholder="e.g. gateway-ap"
-              required
-              class="rounded-lg border border-slate-300 px-3 py-2 text-base shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-          </label>
-          <label class="flex flex-col gap-2 text-sm font-medium text-slate-700">
-            <span>Password</span>
-            <input
-              type="password"
-              value={passphrase}
-              onInput={(event) => {
-                const target = event.currentTarget;
-                if (target instanceof HTMLInputElement) {
-                  setPassphrase(target.value);
-                }
-              }}
-              placeholder="8-63 characters"
-              minLength={8}
-              maxLength={63}
-              required
-              class="rounded-lg border border-slate-300 px-3 py-2 text-base shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={submitting}
-            class="ml-auto inline-flex items-center justify-center rounded-full bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
-          >
-            {submitting ? "Saving…" : "Save"}
-          </button>
-        </form>
-        {submitError && (
-          <p class="mt-4 text-sm font-medium text-red-600">{submitError}</p>
-        )}
-        {submitSuccess && (
-          <p class="mt-4 text-sm font-medium text-emerald-600">
-            {submitSuccess}
-          </p>
-        )}
-      </section>
-    </main>
+            >
+              <span class="menu-icon" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+            </button>
+            {menuOpen && (
+              <div class="menu-sheet" role="menu">
+                {navItems.map((item) => (
+                  <button
+                    key={item.path}
+                    type="button"
+                    role="menuitem"
+                    class={`menu-item${
+                      normalizedUrl === item.path ? " menu-item-active" : ""
+                    }`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      navigate(item.path);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </nav>
+        </div>
+      </header>
+      <main class="mx-auto w-full max-w-4xl space-y-6 px-4 py-8">
+        <BreadcrumbSection meta={pageMeta} onNavigate={navigate} />
+        <Router onChange={handleRouteChange}>
+          <HomePage path="/" onNavigate={navigate} />
+          <DevicePage path="/device" />
+          <WifiPage path="/wifi" />
+          <HomePage default onNavigate={navigate} />
+        </Router>
+      </main>
+    </div>
   );
 }
