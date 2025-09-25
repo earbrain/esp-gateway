@@ -435,6 +435,9 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
                           "passphrase");
     }
 
+    ESP_LOGI("gateway", "Received Wi-Fi credentials update for SSID: %s",
+             ssid.c_str());
+
     result = gateway->save_wifi_credentials(ssid, passphrase);
     cJSON_Delete(root);
 
@@ -449,6 +452,8 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     if (!response) {
         return ESP_ERR_NO_MEM;
     }
+
+    ESP_LOGI("gateway", "Wi-Fi credentials saved. Restart required: true");
 
     cJSON_AddStringToObject(response, "result", "ok");
     cJSON_AddBoolToObject(response, "restart_required", true);
