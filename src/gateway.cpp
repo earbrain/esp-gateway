@@ -4,8 +4,11 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "earbrain/gateway/device_info.hpp"
 #include "esp_chip_info.h"
@@ -134,13 +137,125 @@ static esp_err_t send_embedded(httpd_req_t *req, const uint8_t *begin,
     return httpd_resp_send_chunk(req, nullptr, 0);
 }
 
+struct Gateway::UriHandler {
+    UriHandler(std::string_view path, httpd_method_t m, RequestHandler h,
+               void *ctx)
+        : uri(path), method(m), handler(h), user_ctx(ctx), descriptor{} {
+        refresh_descriptor();
+    }
+
+    void refresh_descriptor() {
+        descriptor.uri = uri.c_str();
+        descriptor.method = method;
+        descriptor.handler = handler;
+        descriptor.user_ctx = user_ctx;
+    }
+
+    std::string uri;
+    httpd_method_t method;
+    RequestHandler handler;
+    void *user_ctx;
+    httpd_uri_t descriptor;
+};
+
 Gateway::Gateway()
     : softap_ssid{}, softap_ssid_len(0), softap_netif(nullptr),
-      http_server(nullptr), softap_running(false), event_loop_created(false) {
+      http_server(nullptr), softap_running(false), event_loop_created(false),
+      builtin_routes_registered(false), routes() {
     set_softap_ssid("gateway-ap"sv);
 }
 
 Gateway::~Gateway() = default;
+
+esp_err_t Gateway::get(std::string_view uri, RequestHandler handler,
+                       void *user_ctx) {
+    return add_route(uri, HTTP_GET, handler, user_ctx ? user_ctx : this);
+}
+
+esp_err_t Gateway::post(std::string_view uri, RequestHandler handler,
+                        void *user_ctx) {
+    return add_route(uri, HTTP_POST, handler, user_ctx ? user_ctx : this);
+}
+
+bool Gateway::has_route(std::string_view uri, httpd_method_t method) const {
+    for (const auto &route : routes) {
+        if (route->method == method && route->uri == uri) {
+            return true;
+        }
+    }
+    return false;
+}
+
+esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
+                             RequestHandler handler, void *user_ctx) {
+    if (uri.empty() || !handler) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (has_route(uri, method)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    auto entry = std::make_unique<UriHandler>(uri, method, handler, user_ctx);
+    UriHandler &route = *entry;
+
+    if (http_server) {
+        const esp_err_t err = register_route_with_server(route);
+        if (err != ESP_OK) {
+            return err;
+        }
+    }
+
+    routes.push_back(std::move(entry));
+    return ESP_OK;
+}
+
+esp_err_t Gateway::register_route_with_server(UriHandler &route) {
+    if (!http_server) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    route.refresh_descriptor();
+    return httpd_register_uri_handler(http_server, &route.descriptor);
+}
+
+void Gateway::ensure_builtin_routes() {
+    if (builtin_routes_registered) {
+        return;
+    }
+
+    builtin_routes_registered = true;
+
+    struct BuiltinRoute {
+        std::string_view uri;
+        httpd_method_t method;
+        RequestHandler handler;
+    };
+
+    static constexpr BuiltinRoute routes_to_register[] = {
+        {"/", HTTP_GET, &Gateway::handle_root_get},
+        {"/app.js", HTTP_GET, &Gateway::handle_app_js_get},
+        {"/assets/index.css", HTTP_GET, &Gateway::handle_assets_css_get},
+        {"/api/v1/device-info", HTTP_GET, &Gateway::handle_device_info_get},
+        {"/api/v1/wifi/credentials", HTTP_POST,
+         &Gateway::handle_wifi_credentials_post},
+    };
+
+    for (const auto &route : routes_to_register) {
+        esp_err_t err = ESP_OK;
+        if (route.method == HTTP_POST) {
+            err = post(route.uri, route.handler, this);
+        } else {
+            err = get(route.uri, route.handler, this);
+        }
+
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+            ESP_LOGW("gateway", "Failed to register builtin route %.*s: %s",
+                     static_cast<int>(route.uri.size()), route.uri.data(),
+                     esp_err_to_name(err));
+        }
+    }
+}
 
 esp_err_t Gateway::start() {
     if (softap_running) {
@@ -192,6 +307,8 @@ esp_err_t Gateway::start() {
         }
         return err;
     }
+
+    ensure_builtin_routes();
 
     err = start_http_server();
     if (err != ESP_OK) {
@@ -262,65 +379,17 @@ esp_err_t Gateway::start_http_server() {
         return err;
     }
 
-    static httpd_uri_t root_uri_handler = {
-        .uri = "/",
-        .method = HTTP_GET,
-        .handler = &Gateway::handle_root_get,
-        .user_ctx = nullptr,
-    };
-    root_uri_handler.user_ctx = this;
-    err = httpd_register_uri_handler(http_server, &root_uri_handler);
-    if (err != ESP_OK) {
-        httpd_stop(http_server);
-        http_server = nullptr;
+    for (auto &route : routes) {
+        route->user_ctx = route->user_ctx ? route->user_ctx : this;
+        const esp_err_t reg_err = register_route_with_server(*route);
+        if (reg_err != ESP_OK) {
+            httpd_stop(http_server);
+            http_server = nullptr;
+            return reg_err;
+        }
     }
 
-    if (err == ESP_OK) {
-        static httpd_uri_t app_js_uri_handler = {
-            .uri = "/app.js",
-            .method = HTTP_GET,
-            .handler = &Gateway::handle_app_js_get,
-            .user_ctx = nullptr,
-        };
-        app_js_uri_handler.user_ctx = this;
-        err = httpd_register_uri_handler(http_server, &app_js_uri_handler);
-    }
-
-    if (err == ESP_OK) {
-        static httpd_uri_t css_uri_handler = {
-            .uri = "/assets/index.css",
-            .method = HTTP_GET,
-            .handler = &Gateway::handle_assets_css_get,
-            .user_ctx = nullptr,
-        };
-        css_uri_handler.user_ctx = this;
-        err = httpd_register_uri_handler(http_server, &css_uri_handler);
-    }
-
-    if (err == ESP_OK) {
-        static httpd_uri_t device_info_handler = {
-            .uri = "/api/v1/device-info",
-            .method = HTTP_GET,
-            .handler = &Gateway::handle_device_info_get,
-            .user_ctx = nullptr,
-        };
-        device_info_handler.user_ctx = this;
-        err = httpd_register_uri_handler(http_server, &device_info_handler);
-    }
-
-    if (err == ESP_OK) {
-        static httpd_uri_t wifi_credentials_handler = {
-            .uri = "/api/v1/wifi/credentials",
-            .method = HTTP_POST,
-            .handler = &Gateway::handle_wifi_credentials_post,
-            .user_ctx = nullptr,
-        };
-        wifi_credentials_handler.user_ctx = this;
-        err =
-            httpd_register_uri_handler(http_server, &wifi_credentials_handler);
-    }
-
-    return err;
+    return ESP_OK;
 }
 
 esp_err_t Gateway::handle_root_get(httpd_req_t *req) {
