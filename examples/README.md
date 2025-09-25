@@ -1,7 +1,7 @@
-# Minimal Example
+# ESP Gateway Example
 
 ```sh
-cd examples/minimal
+cd examples
 idf.py set-target esp32  # first run only
 idf.py build flash monitor
 ```
