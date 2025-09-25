@@ -1,5 +1,6 @@
-import { useEffect, useState } from "preact/hooks";
+import { useApi } from "../hooks/useApi";
 import type { FunctionalComponent } from "preact";
+import { useEffect } from "preact/hooks";
 
 type DevicePageProps = {
   path?: string;
@@ -13,39 +14,13 @@ type DeviceInfo = {
 };
 
 export const DevicePage: FunctionalComponent<DevicePageProps> = () => {
-  const [info, setInfo] = useState<DeviceInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: info, loading, error, execute } = useApi<DeviceInfo>(
+    "/api/v1/device-info",
+  );
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchDeviceInfo = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch("/api/v1/device-info", {
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`request failed: ${response.status}`);
-        }
-        const json: DeviceInfo = await response.json();
-        setInfo(json);
-        setError(null);
-      } catch (err) {
-        if ((err as DOMException).name === "AbortError") {
-          return;
-        }
-        console.error(err);
-        setError("Failed to fetch device information.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDeviceInfo();
-    return () => controller.abort();
-  }, []);
+    execute();
+  }, [execute]);
 
   return (
     <section class="space-y-6">
