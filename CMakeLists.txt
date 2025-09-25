@@ -19,10 +19,12 @@ idf_component_register(
     SRCS
         "src/gateway.cpp"
         "src/wifi_softap.cpp"
+        "src/device_info.cpp"
     INCLUDE_DIRS
         "include"
     REQUIRES
         esp_http_server
+        json
     PRIV_REQUIRES
         esp_netif
         esp_event
@@ -32,3 +34,5 @@ idf_component_register(
     EMBED_TXTFILES
         ${PORTAL_ASSETS}
 )
+
+target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_20)

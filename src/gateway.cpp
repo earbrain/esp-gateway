@@ -2,7 +2,11 @@
 
 #include <cstdint>
 #include <cstring>
+#include <string>
+#include <string_view>
 
+#include "earbrain/gateway/device_info.hpp"
+#include "esp_chip_info.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -26,6 +30,30 @@ using namespace std::string_view_literals;
 static constexpr auto html_content_type = "text/html; charset=utf-8";
 static constexpr auto js_content_type = "application/javascript";
 static constexpr auto css_content_type = "text/css";
+static constexpr auto json_content_type = "application/json";
+
+static const char *chip_model_string(const esp_chip_info_t &info) {
+    switch (info.model) {
+    case CHIP_ESP32:
+        return "ESP32";
+    case CHIP_ESP32S2:
+        return "ESP32-S2";
+    case CHIP_ESP32S3:
+        return "ESP32-S3";
+    case CHIP_ESP32C3:
+        return "ESP32-C3";
+    case CHIP_ESP32C2:
+        return "ESP32-C2";
+    case CHIP_ESP32C6:
+        return "ESP32-C6";
+    case CHIP_ESP32H2:
+        return "ESP32-H2";
+    default:
+        return "Unknown";
+    }
+}
+
+static constexpr const char build_timestamp[] = __DATE__ " " __TIME__;
 
 constexpr const uint8_t *truncate_null_terminator(const uint8_t *begin,
                                                   const uint8_t *end) {
@@ -216,6 +244,17 @@ esp_err_t Gateway::start_http_server() {
         err = httpd_register_uri_handler(http_server, &css_uri_handler);
     }
 
+    if (err == ESP_OK) {
+        static httpd_uri_t device_info_handler = {
+            .uri = "/api/v1/device-info",
+            .method = HTTP_GET,
+            .handler = &Gateway::handle_device_info_get,
+            .user_ctx = nullptr,
+        };
+        device_info_handler.user_ctx = this;
+        err = httpd_register_uri_handler(http_server, &device_info_handler);
+    }
+
     return err;
 }
 
@@ -240,6 +279,25 @@ esp_err_t Gateway::handle_assets_css_get(httpd_req_t *req) {
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     return send_embedded(req, ::_binary_index_css_start,
                          ::_binary_index_css_end);
+}
+
+esp_err_t Gateway::handle_device_info_get(httpd_req_t *req) {
+    auto *gateway = static_cast<Gateway *>(req->user_ctx);
+
+    esp_chip_info_t chip_info{};
+    esp_chip_info(&chip_info);
+
+    DeviceInfo device_info;
+    device_info.model = chip_model_string(chip_info);
+    device_info.firmware_version = gateway ? gateway->version() : "unknown";
+    device_info.build_time = build_timestamp;
+    device_info.idf_version = esp_get_idf_version();
+
+    const std::string json_payload = device_info.to_json();
+
+    httpd_resp_set_type(req, json_content_type);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_send(req, json_payload.c_str(), json_payload.size());
 }
 
 void Gateway::set_softap_ssid(std::string_view ssid) {

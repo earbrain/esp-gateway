@@ -27,6 +27,7 @@ private:
   static esp_err_t handle_root_get(httpd_req_t *req);
   static esp_err_t handle_app_js_get(httpd_req_t *req);
   static esp_err_t handle_assets_css_get(httpd_req_t *req);
+  static esp_err_t handle_device_info_get(httpd_req_t *req);
   char softap_ssid[33];
   std::size_t softap_ssid_len;
   esp_netif_obj *softap_netif;
