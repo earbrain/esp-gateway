@@ -19,7 +19,6 @@ idf_component_register(
     SRCS
         "src/gateway.cpp"
         "src/wifi_softap.cpp"
-        "src/device_info.cpp"
     INCLUDE_DIRS
         "include"
     REQUIRES
