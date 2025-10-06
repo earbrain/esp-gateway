@@ -21,6 +21,8 @@ idf_component_register(
         "src/wifi_softap.cpp"
     INCLUDE_DIRS
         "include"
+    PRIV_INCLUDE_DIRS
+        "src"
     REQUIRES
         esp_http_server
         json
