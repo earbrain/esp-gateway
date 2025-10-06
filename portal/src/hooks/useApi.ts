@@ -10,6 +10,41 @@ type UseApiState<T> = {
   reset: () => void;
 };
 
+type ApiResponseStatus = "success" | "fail" | "error";
+
+type ApiResponse<T> = {
+  status: ApiResponseStatus;
+  data: T | Record<string, unknown> | null;
+  error: unknown;
+};
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isErrorObjectWithMessage = (value: unknown): value is { message: string } =>
+  isObject(value) && typeof value.message === "string";
+
+const extractErrorMessage = (
+  payload: Record<string, unknown>,
+  fallback: string,
+): string => {
+  const { error } = payload;
+
+  if (typeof error === "string" && error.length > 0) {
+    return error;
+  }
+
+  if (isErrorObjectWithMessage(error)) {
+    return error.message;
+  }
+
+  if (typeof payload.message === "string" && payload.message.length > 0) {
+    return payload.message;
+  }
+
+  return fallback;
+};
+
 const mergeHeaders = (
   base: HeadersInit | undefined,
   override: HeadersInit | undefined,
@@ -57,9 +92,9 @@ export function useApi<T>(url: string, init?: RequestInit): UseApiState<T> {
         if (!response.ok) {
           let message = `request failed: ${response.status}`;
           try {
-            const json = await response.json();
-            if (json && typeof json.message === "string") {
-              message = json.message;
+            const json = (await response.json()) as Record<string, unknown>;
+            if (isObject(json)) {
+              message = extractErrorMessage(json, message);
             }
           } catch (parseErr) {
             if (parseErr instanceof Error) {
@@ -69,9 +104,25 @@ export function useApi<T>(url: string, init?: RequestInit): UseApiState<T> {
           throw new Error(message);
         }
 
-        const parsed = (await response.json()) as T;
-        setData(parsed);
-        return parsed;
+        const parsed = (await response.json()) as ApiResponse<T>;
+        if (!parsed || typeof parsed.status !== "string") {
+          throw new Error("Unexpected API response format");
+        }
+
+        if (parsed.status !== "success") {
+          const errorValue = parsed.error;
+          const message =
+            typeof errorValue === "string"
+              ? errorValue
+              : isErrorObjectWithMessage(errorValue)
+              ? errorValue.message
+              : "Request failed";
+          throw new Error(message);
+        }
+
+        const payload = parsed.data as T;
+        setData(payload);
+        return payload;
       } catch (err) {
         if ((err as DOMException).name === "AbortError") {
           return null;

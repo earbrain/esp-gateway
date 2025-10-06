@@ -54,21 +54,44 @@ static esp_err_t send_json_response(httpd_req_t *req, cJSON *json) {
     return err;
 }
 
-static esp_err_t send_error(httpd_req_t *req, const char *status,
-                            const char *message, const char *field = nullptr) {
+static esp_err_t send_response(httpd_req_t *req, const char *status,
+                               cJSON *data = nullptr,
+                               const char *error_message = nullptr,
+                               const char *http_status = nullptr) {
     cJSON *root = cJSON_CreateObject();
     if (!root) {
         return ESP_ERR_NO_MEM;
     }
 
-    cJSON_AddStringToObject(root, "result", "error");
-    cJSON_AddStringToObject(root, "message", message);
-    if (field) {
-        cJSON_AddStringToObject(root, "field", field);
+    if (!cJSON_AddStringToObject(root, "status", status)) {
+        cJSON_Delete(root);
+        return ESP_ERR_NO_MEM;
     }
 
-    httpd_resp_set_status(req, status);
-    esp_err_t err = send_json_response(req, root);
+    cJSON *data_obj = data ? data : cJSON_CreateObject();
+    if (!data_obj) {
+        cJSON_Delete(root);
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddItemToObject(root, "data", data_obj);
+
+    cJSON *error_node = nullptr;
+    if (error_message) {
+        error_node = cJSON_CreateString(error_message);
+    } else {
+        error_node = cJSON_CreateNull();
+    }
+    if (!error_node) {
+        cJSON_Delete(root);
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddItemToObject(root, "error", error_node);
+
+    if (http_status) {
+        httpd_resp_set_status(req, http_status);
+    }
+
+    const esp_err_t err = send_json_response(req, root);
     cJSON_Delete(root);
     return err;
 }
@@ -427,23 +450,50 @@ esp_err_t Gateway::handle_device_info_get(httpd_req_t *req) {
     device_info.build_time = build_timestamp;
     device_info.idf_version = esp_get_idf_version();
 
-    const std::string json_payload = device_info.to_json();
+    cJSON *data = cJSON_CreateObject();
+    if (!data) {
+        return ESP_ERR_NO_MEM;
+    }
 
-    httpd_resp_set_type(req, json_content_type);
-    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    return httpd_resp_send(req, json_payload.c_str(), json_payload.size());
+    if (!cJSON_AddStringToObject(data, "model", device_info.model.c_str()) ||
+        !cJSON_AddStringToObject(data, "firmware_version",
+                                 device_info.firmware_version.c_str()) ||
+        !cJSON_AddStringToObject(data, "build_time",
+                                 device_info.build_time.c_str()) ||
+        !cJSON_AddStringToObject(data, "idf_version",
+                                 device_info.idf_version.c_str())) {
+        cJSON_Delete(data);
+        return ESP_ERR_NO_MEM;
+    }
+
+    return send_response(req, "success", data);
 }
 
 esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     auto *gateway = static_cast<Gateway *>(req->user_ctx);
     if (!gateway) {
-        return send_error(req, "500 Internal Server Error",
-                          "Gateway unavailable");
+        cJSON *error_obj = cJSON_CreateObject();
+        if (!error_obj) {
+            return ESP_ERR_NO_MEM;
+        }
+
+        if (!cJSON_AddStringToObject(error_obj, "message",
+                                     "Gateway unavailable") ||
+            !cJSON_AddStringToObject(error_obj, "code",
+                                     "gateway_unavailable")) {
+            cJSON_Delete(error_obj);
+            return ESP_ERR_NO_MEM;
+        }
+
+        return send_response(req, "error", nullptr, "Gateway unavailable",
+                             "500 Internal Server Error");
     }
 
     if (req->content_len <= 0 ||
         static_cast<size_t>(req->content_len) > max_request_body_size) {
-        return send_error(req, "400 Bad Request", "Invalid request size");
+        return send_response(req,
+                             "fail", nullptr, "Invalid request size.",
+                             "400 Bad Request");
     }
 
     std::string body;
@@ -457,8 +507,9 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
             if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
                 continue;
             }
-            return send_error(req, "400 Bad Request",
-                              "Failed to read request body");
+            return send_response(req, "fail", nullptr,
+                                 "Failed to read request body.",
+                                 "400 Bad Request");
         }
         received += static_cast<size_t>(ret);
     }
@@ -468,7 +519,8 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
         if (root) {
             cJSON_Delete(root);
         }
-        return send_error(req, "400 Bad Request", "Invalid JSON body");
+        return send_response(req, "fail", nullptr, "Invalid JSON body.",
+                             "400 Bad Request");
     }
 
     esp_err_t result = ESP_FAIL;
@@ -476,32 +528,55 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     cJSON *ssid_item = cJSON_GetObjectItemCaseSensitive(root, "ssid");
     if (!cJSON_IsString(ssid_item) || ssid_item->valuestring == nullptr) {
         cJSON_Delete(root);
-        return send_error(req, "400 Bad Request", "ssid must be a string",
-                          "ssid");
+        cJSON *data = cJSON_CreateObject();
+        if (!data || !cJSON_AddStringToObject(data, "field", "ssid")) {
+            cJSON_Delete(data);
+            return ESP_ERR_NO_MEM;
+        }
+        return send_response(req, "fail", data, "ssid must be a string.",
+                             "400 Bad Request");
     }
 
     std::string ssid = ssid_item->valuestring;
     if (ssid.empty() || ssid.size() > 32) {
         cJSON_Delete(root);
-        return send_error(req, "400 Bad Request",
-                          "ssid must be 1-32 characters", "ssid");
+        cJSON *data = cJSON_CreateObject();
+        if (!data || !cJSON_AddStringToObject(data, "field", "ssid")) {
+            cJSON_Delete(data);
+            return ESP_ERR_NO_MEM;
+        }
+        return send_response(req, "fail", data,
+                             "ssid must be 1-32 characters.",
+                             "400 Bad Request");
     }
 
     cJSON *pass_item = cJSON_GetObjectItemCaseSensitive(root, "passphrase");
     if (!pass_item || !cJSON_IsString(pass_item) ||
         pass_item->valuestring == nullptr) {
         cJSON_Delete(root);
-        return send_error(req, "400 Bad Request",
-                          "passphrase must be provided as a string",
-                          "passphrase");
+        cJSON *data = cJSON_CreateObject();
+        if (!data ||
+            !cJSON_AddStringToObject(data, "field", "passphrase")) {
+            cJSON_Delete(data);
+            return ESP_ERR_NO_MEM;
+        }
+        return send_response(req, "fail", data,
+                             "passphrase must be a string.",
+                             "400 Bad Request");
     }
 
     std::string passphrase = pass_item->valuestring;
     if (!is_valid_passphrase(passphrase)) {
         cJSON_Delete(root);
-        return send_error(req, "400 Bad Request",
-                          "passphrase must be 8-63 chars or 64 hex",
-                          "passphrase");
+        cJSON *data = cJSON_CreateObject();
+        if (!data ||
+            !cJSON_AddStringToObject(data, "field", "passphrase")) {
+            cJSON_Delete(data);
+            return ESP_ERR_NO_MEM;
+        }
+        return send_response(req, "fail", data,
+                             "Passphrase must be 8-63 chars or 64 hex.",
+                             "400 Bad Request");
     }
 
     ESP_LOGI("gateway", "Received Wi-Fi credentials update for SSID: %s",
@@ -513,23 +588,28 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     if (result != ESP_OK) {
         ESP_LOGE("gateway", "Failed to save Wi-Fi credentials: %s",
                  esp_err_to_name(result));
-        return send_error(req, "500 Internal Server Error",
-                          "Failed to save credentials");
-    }
-
-    cJSON *response = cJSON_CreateObject();
-    if (!response) {
-        return ESP_ERR_NO_MEM;
+        cJSON *data = cJSON_CreateObject();
+        if (data) {
+            cJSON_AddStringToObject(data, "detail", esp_err_to_name(result));
+        }
+        return send_response(req, "error", data,
+                             "Failed to save credentials.",
+                             "500 Internal Server Error");
     }
 
     ESP_LOGI("gateway", "Wi-Fi credentials saved. Restart required: true");
 
-    cJSON_AddStringToObject(response, "result", "ok");
-    cJSON_AddBoolToObject(response, "restart_required", true);
+    cJSON *data = cJSON_CreateObject();
+    if (!data) {
+        return ESP_ERR_NO_MEM;
+    }
 
-    const esp_err_t send_result = send_json_response(req, response);
-    cJSON_Delete(response);
-    return send_result;
+    if (!cJSON_AddBoolToObject(data, "restart_required", true)) {
+        cJSON_Delete(data);
+        return ESP_ERR_NO_MEM;
+    }
+
+    return send_response(req, "success", data);
 }
 
 esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
