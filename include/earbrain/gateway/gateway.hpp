@@ -50,6 +50,7 @@ private:
   char softap_ssid[33];
   std::size_t softap_ssid_len;
   esp_netif_obj *softap_netif;
+  esp_netif_obj *sta_netif;
   httpd_handle_t http_server;
   bool softap_running;
   bool event_loop_created;

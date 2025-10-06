@@ -19,16 +19,16 @@ esp_err_t Gateway::start_softap() {
     return err;
   }
 
-  wifi_config_t config = {};
-  std::copy_n(softap_ssid, softap_ssid_len, config.ap.ssid);
-  config.ap.ssid_len = softap_ssid_len;
-  config.ap.channel = 1;
-  config.ap.authmode = WIFI_AUTH_OPEN;
-  config.ap.max_connection = 4;
+  wifi_config_t ap_config = {};
+  std::copy_n(softap_ssid, softap_ssid_len, ap_config.ap.ssid);
+  ap_config.ap.ssid_len = softap_ssid_len;
+  ap_config.ap.channel = 1;
+  ap_config.ap.authmode = WIFI_AUTH_OPEN;
+  ap_config.ap.max_connection = 4;
 
-  err = esp_wifi_set_mode(WIFI_MODE_AP);
+  err = esp_wifi_set_mode(WIFI_MODE_APSTA);
   if (err == ESP_OK) {
-    err = esp_wifi_set_config(WIFI_IF_AP, &config);
+    err = esp_wifi_set_config(WIFI_IF_AP, &ap_config);
   }
 
   if (err == ESP_OK) {
@@ -39,8 +39,8 @@ esp_err_t Gateway::start_softap() {
     esp_wifi_deinit();
     return err;
   }
-  ESP_LOGI("gateway", "SoftAP started: %.*s", config.ap.ssid_len,
-           config.ap.ssid);
+  ESP_LOGI("gateway", "SoftAP started in AP+STA mode: %.*s", ap_config.ap.ssid_len,
+           ap_config.ap.ssid);
   return ESP_OK;
 }
 

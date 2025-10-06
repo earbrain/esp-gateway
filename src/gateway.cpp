@@ -131,7 +131,8 @@ struct Gateway::UriHandler {
 
 Gateway::Gateway()
     : softap_ssid{}, softap_ssid_len(0), softap_netif(nullptr),
-      http_server(nullptr), softap_running(false), event_loop_created(false),
+      sta_netif(nullptr), http_server(nullptr), softap_running(false),
+      event_loop_created(false),
       builtin_routes_registered(false), routes() {
     set_softap_ssid("gateway-ap"sv);
 }
@@ -264,14 +265,26 @@ esp_err_t Gateway::start() {
         softap_netif = nullptr;
     }
 
-    esp_netif_obj *new_netif = esp_netif_create_default_wifi_ap();
-    if (!new_netif) {
+    if (sta_netif) {
+        esp_netif_destroy_default_wifi(sta_netif);
+        sta_netif = nullptr;
+    }
+
+    esp_netif_obj *new_ap_netif = esp_netif_create_default_wifi_ap();
+    if (!new_ap_netif) {
+        return ESP_FAIL;
+    }
+
+    esp_netif_obj *new_sta_netif = esp_netif_create_default_wifi_sta();
+    if (!new_sta_netif) {
+        esp_netif_destroy_default_wifi(new_ap_netif);
         return ESP_FAIL;
     }
 
     err = start_softap();
     if (err != ESP_OK) {
-        esp_netif_destroy_default_wifi(new_netif);
+        esp_netif_destroy_default_wifi(new_sta_netif);
+        esp_netif_destroy_default_wifi(new_ap_netif);
         if (event_loop_created) {
             esp_event_loop_delete_default();
             event_loop_created = false;
@@ -285,7 +298,8 @@ esp_err_t Gateway::start() {
     if (err != ESP_OK) {
         esp_wifi_stop();
         esp_wifi_deinit();
-        esp_netif_destroy_default_wifi(new_netif);
+        esp_netif_destroy_default_wifi(new_sta_netif);
+        esp_netif_destroy_default_wifi(new_ap_netif);
         if (event_loop_created) {
             esp_event_loop_delete_default();
             event_loop_created = false;
@@ -293,7 +307,8 @@ esp_err_t Gateway::start() {
         return err;
     }
 
-    softap_netif = new_netif;
+    softap_netif = new_ap_netif;
+    sta_netif = new_sta_netif;
     ESP_LOGI("gateway", "SoftAP ready");
     softap_running = true;
     return ESP_OK;
@@ -324,6 +339,11 @@ esp_err_t Gateway::stop() {
     if (softap_netif) {
         esp_netif_destroy_default_wifi(softap_netif);
         softap_netif = nullptr;
+    }
+
+    if (sta_netif) {
+        esp_netif_destroy_default_wifi(sta_netif);
+        sta_netif = nullptr;
     }
 
     if (event_loop_created) {
