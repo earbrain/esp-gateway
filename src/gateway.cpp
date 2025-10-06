@@ -439,11 +439,9 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     }
     WifiCredentials credentials{};
     const char *bad_field = nullptr;
-    if (!json_model::parse_wifi_credentials(root.get(), credentials,
-                                            &bad_field)) {
+    if (!json_model::parse_wifi_credentials(root.get(), credentials, &bad_field)) {
         std::string message = bad_field
-                                  ? std::string(bad_field) +
-                                    " must be a string."
+                                  ? std::string(bad_field) + " must be a string."
                                   : "Invalid credentials payload.";
         return http::send_fail_field(req, bad_field ? bad_field : "body", message.c_str());
     }
