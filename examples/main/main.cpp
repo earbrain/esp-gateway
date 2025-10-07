@@ -1,6 +1,6 @@
 #include "earbrain/gateway/gateway.hpp"
 #include "esp_err.h"
-#include "esp_log.h"
+#include "earbrain/gateway/logging.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -17,33 +17,33 @@ extern "C" void app_main(void) {
 
   // Register user custom API
   if (gateway.add_route("/api/ext/hello", HTTP_GET, &custom_hello_handler) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to register /api/ext/hello");
+    earbrain::logging::error("Failed to register /api/ext/hello", TAG);
     return;
   }
 
-  ESP_LOGI(TAG, "Gateway version: %s", gateway.version());
+  earbrain::logging::infof(TAG, "Gateway version: %s", gateway.version());
 
-  ESP_LOGI(TAG, "Starting access point");
+  earbrain::logging::info("Starting access point", TAG);
   earbrain::AccessPointConfig ap_cfg;
   ap_cfg.ssid = "gateway-ap";
   if (gateway.start_access_point(ap_cfg) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to start access point");
+    earbrain::logging::error("Failed to start access point", TAG);
     return;
   }
 
   const esp_err_t sta_saved_err = gateway.start_station();
   if (sta_saved_err == ESP_ERR_NOT_FOUND) {
-    ESP_LOGI(TAG, "No saved station credentials; AP mode only.");
+    earbrain::logging::info("No saved station credentials; AP mode only.", TAG);
   } else if (sta_saved_err != ESP_OK) {
-    ESP_LOGW(TAG, "Failed to start station with saved credentials: %s",
-             esp_err_to_name(sta_saved_err));
+    earbrain::logging::warnf(TAG, "Failed to start station with saved credentials: %s",
+                             esp_err_to_name(sta_saved_err));
   } else {
-    ESP_LOGI(TAG, "Station auto-connect started using saved credentials");
+    earbrain::logging::info("Station auto-connect started using saved credentials", TAG);
   }
 
-  ESP_LOGI(TAG, "Starting HTTP server");
+  earbrain::logging::info("Starting HTTP server", TAG);
   if (gateway.start_server() != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to start HTTP server");
+    earbrain::logging::error("Failed to start HTTP server", TAG);
     return;
   }
 
@@ -56,7 +56,7 @@ extern "C" void app_main(void) {
 
   const esp_err_t mdns_err = gateway.start_mdns(mdns_cfg);
   if (mdns_err != ESP_OK) {
-    ESP_LOGW(TAG, "Failed to start mDNS: %s", esp_err_to_name(mdns_err));
+    earbrain::logging::warnf(TAG, "Failed to start mDNS: %s", esp_err_to_name(mdns_err));
   }
 
   while (true) {
