@@ -63,6 +63,20 @@ const mergeHeaders = (
   return merged;
 };
 
+function isEqual<T>(a: T | null, b: T | null): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (!a || !b) {
+    return false;
+  }
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+
 export function useApi<T>(url: string, init?: RequestInit): UseApiState<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -111,17 +125,21 @@ export function useApi<T>(url: string, init?: RequestInit): UseApiState<T> {
 
         if (parsed.status !== "success") {
           const errorValue = parsed.error;
-          const message =
-            typeof errorValue === "string"
-              ? errorValue
-              : isErrorObjectWithMessage(errorValue)
+          const message = typeof errorValue === "string"
+            ? errorValue
+            : isErrorObjectWithMessage(errorValue)
               ? errorValue.message
               : "Request failed";
           throw new Error(message);
         }
 
         const payload = parsed.data as T;
-        setData(payload);
+        setData((prev) => {
+          if (isEqual(prev, payload)) {
+            return prev;
+          }
+          return payload;
+        });
         return payload;
       } catch (err) {
         if ((err as DOMException).name === "AbortError") {
