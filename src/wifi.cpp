@@ -264,19 +264,20 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
     return err;
   }
 
-  wifi_config_t sta_cfg = make_sta_config(config);
-
   const bool previous_state = sta_active;
   sta_active = true;
 
-  err = esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
+  err = apply_wifi_mode();
   if (err != ESP_OK) {
     sta_last_error = err;
     sta_active = previous_state;
+    apply_wifi_mode();
     return err;
   }
 
-  err = apply_wifi_mode();
+  wifi_config_t sta_cfg = make_sta_config(config);
+
+  err = esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
   if (err != ESP_OK) {
     sta_last_error = err;
     sta_active = previous_state;
