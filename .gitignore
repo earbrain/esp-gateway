@@ -23,3 +23,7 @@ dependencies.lock
 # ESP-IDF configuration files
 sdkconfig
 sdkconfig.old
+
+# ESP-IDF managed components
+managed_components/
+examples/managed_components/
