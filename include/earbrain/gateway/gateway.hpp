@@ -47,6 +47,7 @@ public:
   esp_err_t start_access_point();
   esp_err_t start_access_point(const AccessPointConfig &config);
   esp_err_t stop_access_point();
+  esp_err_t start_station();
   esp_err_t start_station(const StationConfig &config);
   esp_err_t stop_station();
   esp_err_t start_server();
@@ -110,6 +111,7 @@ private:
   std::vector<std::unique_ptr<UriHandler>> routes;
   bool sta_connecting;
   bool sta_connected;
+  int sta_retry_count;
   esp_ip4_addr_t sta_ip;
   wifi_err_reason_t sta_last_disconnect_reason;
   esp_err_t sta_last_error;

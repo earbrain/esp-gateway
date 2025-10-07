@@ -138,7 +138,7 @@ Gateway::Gateway()
     wifi_initialized(false), wifi_started(false), ap_active(false),
     sta_active(false), wifi_handlers_registered(false),
     builtin_routes_registered(false), routes(), sta_connecting(false),
-    sta_connected(false), sta_ip{},
+    sta_connected(false), sta_retry_count(0), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
     sta_last_error(ESP_OK), saved_sta_config{}, has_saved_sta_credentials(false),
     sta_credentials_loaded(false), sta_autoconnect_attempted(false),
@@ -402,8 +402,9 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     return http::send_fail_field(req, "passphrase", "Passphrase must be 8-63 chars or 64 hex.");
   }
 
-  logging::infof("gateway", "Received Wi-Fi credentials update for SSID: %s",
-                 credentials.ssid.c_str());
+  logging::infof("gateway",
+                 "Received Wi-Fi credentials update for SSID='%s' (len=%zu)",
+                 credentials.ssid.c_str(), credentials.ssid.size());
 
   const esp_err_t result = gateway->save_wifi_credentials(credentials.ssid, credentials.passphrase);
 

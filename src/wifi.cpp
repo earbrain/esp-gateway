@@ -65,11 +65,31 @@ static wifi_config_t make_sta_config(const StationConfig &config) {
                 cfg.sta.password);
   }
 
+  cfg.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+  cfg.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+  cfg.sta.listen_interval = 3;
   cfg.sta.pmf_cfg.capable = true;
   cfg.sta.pmf_cfg.required = false;
   cfg.sta.threshold.authmode =
       config.passphrase.empty() ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA2_PSK;
   return cfg;
+}
+
+static constexpr int sta_max_connect_retries = 5;
+
+static bool should_retry_reason(wifi_err_reason_t reason) {
+  switch (reason) {
+  case WIFI_REASON_NO_AP_FOUND:
+  case WIFI_REASON_AUTH_EXPIRE:
+  case WIFI_REASON_AUTH_FAIL:
+  case WIFI_REASON_ASSOC_FAIL:
+  case WIFI_REASON_HANDSHAKE_TIMEOUT:
+  case WIFI_REASON_ASSOC_EXPIRE:
+  case WIFI_REASON_BEACON_TIMEOUT:
+    return true;
+  default:
+    return false;
+  }
 }
 
 esp_err_t Gateway::ensure_wifi_initialized() {
@@ -298,12 +318,34 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
   sta_config = config;
   sta_connecting = true;
   sta_connected = false;
+  sta_retry_count = 0;
   sta_last_error = ESP_OK;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
   sta_ip.addr = 0;
-  logging::infof(wifi_tag, "Station connection started: %s",
-                 sta_config.ssid.c_str());
+  logging::infof(wifi_tag,
+                 "Station connection started: ssid='%s' (len=%zu)",
+                 sta_config.ssid.c_str(), sta_config.ssid.size());
   return ESP_OK;
+}
+
+esp_err_t Gateway::start_station() {
+  const esp_err_t init_err = ensure_wifi_initialized();
+  if (init_err != ESP_OK) {
+    return init_err;
+  }
+
+  if (!has_saved_sta_credentials || saved_sta_config.ssid.empty()) {
+    return ESP_ERR_NOT_FOUND;
+  }
+
+  logging::infof(wifi_tag,
+                 "Attempting auto-connect to saved SSID: '%s' (len=%zu)",
+                 saved_sta_config.ssid.c_str(), saved_sta_config.ssid.size());
+
+  sta_autoconnect_attempted = true;
+
+  StationConfig cfg = saved_sta_config;
+  return start_station(cfg);
 }
 
 esp_err_t Gateway::stop_station() {
@@ -330,6 +372,7 @@ esp_err_t Gateway::stop_station() {
 
   sta_connecting = false;
   sta_connected = false;
+  sta_retry_count = 0;
   sta_last_error = ESP_OK;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
   sta_ip.addr = 0;
@@ -385,6 +428,26 @@ void Gateway::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
   sta_ip.addr = 0;
   logging::warnf(wifi_tag, "Station disconnected (reason=%d)",
                  static_cast<int>(event.reason));
+
+  const wifi_err_reason_t reason =
+      static_cast<wifi_err_reason_t>(event.reason);
+  if (sta_active && should_retry_reason(reason) && sta_retry_count < sta_max_connect_retries) {
+    ++sta_retry_count;
+    const esp_err_t err = esp_wifi_connect();
+    if (err == ESP_OK || err == ESP_ERR_WIFI_CONN) {
+      logging::infof(wifi_tag,
+                     "Retrying station connection (attempt %d/%d)",
+                     sta_retry_count, sta_max_connect_retries);
+    } else {
+      logging::warnf(wifi_tag,
+                     "Failed to trigger reconnect attempt %d: %s",
+                     sta_retry_count, esp_err_to_name(err));
+    }
+  } else if (sta_retry_count >= sta_max_connect_retries) {
+    logging::warnf(wifi_tag,
+                   "Station retries exhausted after %d attempts",
+                   sta_max_connect_retries);
+  }
 }
 
 esp_err_t Gateway::load_wifi_credentials() {
@@ -470,16 +533,11 @@ void Gateway::start_station_with_saved_profile() {
   if (sta_autoconnect_attempted) {
     return;
   }
-  sta_autoconnect_attempted = true;
 
-  if (!has_saved_sta_credentials || saved_sta_config.ssid.empty()) {
+  const esp_err_t err = start_station();
+  if (err == ESP_ERR_NOT_FOUND) {
     return;
   }
-
-  logging::infof(wifi_tag, "Attempting auto-connect to saved SSID: %s",
-                 saved_sta_config.ssid.c_str());
-  StationConfig cfg = saved_sta_config;
-  const esp_err_t err = start_station(cfg);
   if (err != ESP_OK) {
     logging::warnf(wifi_tag, "Auto station connect failed: %s",
                    esp_err_to_name(err));
