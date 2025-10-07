@@ -20,6 +20,8 @@ namespace earbrain {
 
 static constexpr const char wifi_tag[] = "gateway";
 
+static constexpr uint8_t sta_listen_interval = 1;
+static constexpr int8_t sta_tx_power_qdbm = 78;
 static bool is_valid_ssid(std::string_view ssid) {
   return !ssid.empty() && ssid.size() <= 32;
 }
@@ -67,7 +69,7 @@ static wifi_config_t make_sta_config(const StationConfig &config) {
 
   cfg.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
   cfg.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
-  cfg.sta.listen_interval = 3;
+  cfg.sta.listen_interval = sta_listen_interval;
   cfg.sta.pmf_cfg.capable = true;
   cfg.sta.pmf_cfg.required = false;
   cfg.sta.threshold.authmode =
@@ -301,6 +303,18 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
     sta_active = previous_state;
     apply_wifi_mode();
     return err;
+  }
+
+  esp_err_t ps_err = esp_wifi_set_ps(WIFI_PS_NONE);
+  if (ps_err != ESP_OK) {
+    logging::warnf(wifi_tag, "Failed to disable power save: %s",
+                   esp_err_to_name(ps_err));
+  }
+
+  ps_err = esp_wifi_set_max_tx_power(sta_tx_power_qdbm);
+  if (ps_err != ESP_OK) {
+    logging::warnf(wifi_tag, "Failed to raise STA TX power: %s",
+                   esp_err_to_name(ps_err));
   }
 
   err = esp_wifi_connect();
