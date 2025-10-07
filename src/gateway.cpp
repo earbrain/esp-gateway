@@ -203,6 +203,8 @@ void Gateway::ensure_builtin_routes() {
 
   static constexpr BuiltinRoute routes_to_register[] = {
       {"/", HTTP_GET, &Gateway::handle_root_get},
+      {"/wifi", HTTP_GET, &Gateway::handle_root_get},
+      {"/device", HTTP_GET, &Gateway::handle_root_get},
       {"/app.js", HTTP_GET, &Gateway::handle_app_js_get},
       {"/assets/index.css", HTTP_GET, &Gateway::handle_assets_css_get},
       {"/api/v1/device-info", HTTP_GET, &Gateway::handle_device_info_get},
