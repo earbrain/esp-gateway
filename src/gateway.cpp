@@ -42,6 +42,7 @@ static constexpr auto html_content_type = "text/html; charset=utf-8";
 static constexpr auto js_content_type = "application/javascript";
 static constexpr auto css_content_type = "text/css";
 static constexpr size_t max_request_body_size = 1024;
+
 static bool is_valid_passphrase(std::string_view passphrase) {
   const std::size_t len = passphrase.size();
   if (len >= 8 && len <= 63) {
@@ -130,17 +131,25 @@ struct Gateway::UriHandler {
 Gateway::Gateway()
   : softap_ssid{}, softap_ssid_len(0), softap_netif(nullptr),
     sta_netif(nullptr), http_server(nullptr), server_running(false),
-    event_loop_created(false), nvs_initialized(false), wifi_initialized(false),
-    wifi_started(false), ap_active(false), sta_active(false),
-    wifi_handlers_registered(false), builtin_routes_registered(false),
-    routes(), sta_connecting(false), sta_connected(false), sta_ip{},
+    wifi_initialized(false), wifi_started(false), ap_active(false),
+    sta_active(false), wifi_handlers_registered(false),
+    builtin_routes_registered(false), routes(), sta_connecting(false),
+    sta_connected(false), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
     sta_last_error(ESP_OK), saved_sta_config{}, has_saved_sta_credentials(false),
     sta_credentials_loaded(false), sta_autoconnect_attempted(false) {
   set_softap_ssid("gateway-ap"sv);
 }
 
-Gateway::~Gateway() = default;
+Gateway::~Gateway() {
+  stop_server();
+  if (sta_active || sta_connecting || sta_connected) {
+    stop_station();
+  }
+  if (ap_active) {
+    stop_access_point();
+  }
+}
 
 bool Gateway::has_route(std::string_view uri, httpd_method_t method) const {
   for (const auto &route : routes) {

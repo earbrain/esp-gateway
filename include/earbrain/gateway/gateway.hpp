@@ -87,8 +87,6 @@ private:
   StationConfig sta_config;
   httpd_handle_t http_server;
   bool server_running;
-  bool event_loop_created;
-  bool nvs_initialized;
   bool wifi_initialized;
   bool wifi_started;
   bool ap_active;

@@ -10,6 +10,7 @@
 #include "esp_netif_ip_addr.h"
 #include "esp_wifi.h"
 #include "esp_wifi_default.h"
+#include "nvs.h"
 #include "nvs_flash.h"
 #include "lwip/ip4_addr.h"
 
@@ -70,36 +71,26 @@ static wifi_config_t make_sta_config(const StationConfig &config) {
 }
 
 esp_err_t Gateway::ensure_wifi_initialized() {
-  if (!nvs_initialized) {
-    esp_err_t nvs_err = nvs_flash_init();
-    if (nvs_err == ESP_ERR_NVS_NO_FREE_PAGES ||
-        nvs_err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      esp_err_t erase_err = nvs_flash_erase();
-      if (erase_err != ESP_OK) {
-        return erase_err;
-      }
-      nvs_err = nvs_flash_init();
+  esp_err_t err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    err = nvs_flash_erase();
+    if (err != ESP_OK) {
+      return err;
     }
-    if (nvs_err != ESP_OK) {
-      return nvs_err;
-    }
-    nvs_initialized = true;
+    err = nvs_flash_init();
+  }
+  if (err != ESP_OK && err != ESP_ERR_NVS_INVALID_STATE) {
+    return err;
   }
 
-  esp_err_t err = esp_netif_init();
+  err = esp_netif_init();
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
     return err;
   }
 
-  if (!event_loop_created) {
-    err = esp_event_loop_create_default();
-    if (err == ESP_ERR_INVALID_STATE) {
-      event_loop_created = true;
-    } else if (err == ESP_OK) {
-      event_loop_created = true;
-    } else {
-      return err;
-    }
+  err = esp_event_loop_create_default();
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    return err;
   }
 
   if (!softap_netif) {
