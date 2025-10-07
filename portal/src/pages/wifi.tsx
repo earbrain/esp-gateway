@@ -42,27 +42,21 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
   const [settingsVisible, setSettingsVisible] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
-  const { execute, loading, error, reset } = useApi<WifiResponse>(
-    "/api/v1/wifi/credentials",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+  const { execute, loading, error, reset } = useApi<WifiResponse>("/api/v1/wifi/credentials", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+  });
 
   const {
     data: status,
     loading: statusLoading,
     error: statusError,
     execute: fetchStatus,
-  } = useApi<WifiStatus>(
-    "/api/v1/wifi/status",
-    {
-      method: "GET",
-    },
-  );
+  } = useApi<WifiStatus>("/api/v1/wifi/status", {
+    method: "GET",
+  });
 
   const { refresh: refreshStatus } = usePolling(() => fetchStatus(), {
     intervalMs: 5000,
@@ -198,9 +192,7 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
     }
 
     if (!isLengthValid && !isHexCandidate) {
-      setValidationError(
-        "Password must be 8-63 characters or a 64-digit hex string.",
-      );
+      setValidationError("Password must be 8-63 characters or a 64-digit hex string.");
       reset();
       return;
     }
@@ -227,7 +219,7 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
           messageParts.push(`Error: ${sta_error}`);
         }
         showToast(sta_error ? "error" : "success", messageParts.join(" "));
-        setValues({ ssid: trimmedSsid, passphrase: "" });
+        setValues({ ssid: trimmedSsid, passphrase });
         refreshStatus();
       }
     } catch (err) {
@@ -243,11 +235,7 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
           role="status"
           aria-live="polite"
         >
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
+          <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
         </div>
       )}
       <section class="space-y-6">
