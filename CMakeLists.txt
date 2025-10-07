@@ -34,6 +34,8 @@ idf_component_register(
         nvs_flash
         log
         mdns
+        esp_timer
+        heap
     EMBED_TXTFILES
         ${PORTAL_ASSETS}
 )
