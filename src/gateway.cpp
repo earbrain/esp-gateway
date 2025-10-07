@@ -174,7 +174,7 @@ esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
   return ESP_OK;
 }
 
-esp_err_t Gateway::register_route_with_server(UriHandler &route) {
+esp_err_t Gateway::register_route_with_server(UriHandler &route) const {
   if (!http_server) {
     return ESP_ERR_INVALID_STATE;
   }
