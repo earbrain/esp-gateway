@@ -288,6 +288,9 @@ esp_err_t Gateway::start_http_server() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.max_uri_handlers = 16;
   config.lru_purge_enable = true;
+  // Allow slower clients more time before the server aborts the socket on send/recv.
+  config.recv_wait_timeout = 10;
+  config.send_wait_timeout = 15;
 
   esp_err_t err = httpd_start(&http_server, &config);
   if (err != ESP_OK) {
