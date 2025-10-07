@@ -15,7 +15,7 @@ extern "C" void app_main(void) {
   earbrain::Gateway gateway;
 
   // Register user custom API
-  if (gateway.get("/api/ext/hello", &custom_hello_handler) != ESP_OK) {
+  if (gateway.add_route("/api/ext/hello", HTTP_GET, &custom_hello_handler) != ESP_OK) {
     ESP_LOGE(TAG, "Failed to register /api/ext/hello");
     return;
   }

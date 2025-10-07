@@ -140,16 +140,6 @@ Gateway::Gateway()
 
 Gateway::~Gateway() = default;
 
-esp_err_t Gateway::get(std::string_view uri, RequestHandler handler,
-                       void *user_ctx) {
-  return add_route(uri, HTTP_GET, handler, user_ctx ? user_ctx : this);
-}
-
-esp_err_t Gateway::post(std::string_view uri, RequestHandler handler,
-                        void *user_ctx) {
-  return add_route(uri, HTTP_POST, handler, user_ctx ? user_ctx : this);
-}
-
 bool Gateway::has_route(std::string_view uri, httpd_method_t method) const {
   for (const auto &route : routes) {
     if (route->method == method && route->uri == uri) {
@@ -169,7 +159,8 @@ esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
     return ESP_ERR_INVALID_STATE;
   }
 
-  auto entry = std::make_unique<UriHandler>(uri, method, handler, user_ctx);
+  auto entry = std::make_unique<UriHandler>(
+      uri, method, handler, user_ctx ? user_ctx : this);
   UriHandler &route = *entry;
 
   if (http_server) {
@@ -216,11 +207,7 @@ void Gateway::ensure_builtin_routes() {
 
   for (const auto &route : routes_to_register) {
     esp_err_t err = ESP_OK;
-    if (route.method == HTTP_POST) {
-      err = post(route.uri, route.handler, this);
-    } else {
-      err = get(route.uri, route.handler, this);
-    }
+    err = add_route(route.uri, route.method, route.handler, this);
 
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
       ESP_LOGW("gateway", "Failed to register builtin route %.*s: %s",

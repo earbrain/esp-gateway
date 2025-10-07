@@ -42,10 +42,8 @@ public:
 
   using RequestHandler = esp_err_t (*)(httpd_req_t *);
 
-  esp_err_t get(std::string_view uri, RequestHandler handler,
-                void *user_ctx = nullptr);
-  esp_err_t post(std::string_view uri, RequestHandler handler,
-                 void *user_ctx = nullptr);
+  esp_err_t add_route(std::string_view uri, httpd_method_t method,
+                      RequestHandler handler, void *user_ctx = nullptr);
 
   const char *version() const { return "0.0.0"; }
 
@@ -54,8 +52,6 @@ private:
 
   esp_err_t start_http_server();
   void ensure_builtin_routes();
-  esp_err_t add_route(std::string_view uri, httpd_method_t method,
-                      RequestHandler handler, void *user_ctx);
   esp_err_t register_route_with_server(UriHandler &route);
   bool has_route(std::string_view uri, httpd_method_t method) const;
   static esp_err_t handle_root_get(httpd_req_t *req);
