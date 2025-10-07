@@ -382,14 +382,44 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     return http::send_error(req, "Failed to save credentials.", esp_err_to_name(result));
   }
 
-  ESP_LOGI("gateway", "Wi-Fi credentials saved. Restart required: true");
+  ESP_LOGI("gateway", "Wi-Fi credentials saved. Preparing to start station");
+
+  esp_err_t sta_err = ESP_OK;
+  bool sta_started = false;
+
+  const esp_err_t stop_err = gateway->stop_station();
+  if (stop_err != ESP_OK) {
+    ESP_LOGW("gateway", "Failed to stop existing station: %s",
+             esp_err_to_name(stop_err));
+  }
+
+  StationConfig station_cfg{};
+  station_cfg.ssid = credentials.ssid;
+  station_cfg.passphrase = credentials.passphrase;
+
+  sta_err = gateway->start_station(station_cfg);
+  if (sta_err == ESP_OK) {
+    sta_started = true;
+    ESP_LOGI("gateway", "Station connection initiated for SSID: %s",
+             station_cfg.ssid.c_str());
+  } else {
+    ESP_LOGE("gateway", "Failed to start station: %s", esp_err_to_name(sta_err));
+  }
 
   auto data = json::object();
   if (!data) {
     return ESP_ERR_NO_MEM;
   }
-  if (json::add(data.get(), "restart_required", true) != ESP_OK) {
+  if (json::add(data.get(), "restart_required", !sta_started) != ESP_OK) {
     return ESP_ERR_NO_MEM;
+  }
+  if (json::add(data.get(), "sta_connect_started", sta_started) != ESP_OK) {
+    return ESP_ERR_NO_MEM;
+  }
+  if (!sta_started) {
+    if (json::add(data.get(), "sta_error", esp_err_to_name(sta_err)) != ESP_OK) {
+      return ESP_ERR_NO_MEM;
+    }
   }
 
   return http::send_success(req, std::move(data));
