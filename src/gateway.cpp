@@ -222,6 +222,7 @@ void Gateway::ensure_builtin_routes() {
       {"/api/v1/wifi/credentials", HTTP_POST,
        &Gateway::handle_wifi_credentials_post},
       {"/api/v1/wifi/status", HTTP_GET, &Gateway::handle_wifi_status_get},
+      {"/api/v1/mdns", HTTP_GET, &Gateway::handle_mdns_get},
   };
 
   for (const auto &route : routes_to_register) {
@@ -469,6 +470,44 @@ esp_err_t Gateway::handle_wifi_status_get(httpd_req_t *req) {
 
   auto data = json_model::to_json(status);
   if (!data) {
+    return ESP_ERR_NO_MEM;
+  }
+
+  return http::send_success(req, std::move(data));
+}
+
+esp_err_t Gateway::handle_mdns_get(httpd_req_t *req) {
+  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  if (!gateway) {
+    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+  }
+
+  auto data = json::object();
+  if (!data) {
+    return ESP_ERR_NO_MEM;
+  }
+
+  const MdnsConfig &config = gateway->mdns_config;
+
+  if (json::add(data.get(), "hostname", config.hostname) != ESP_OK) {
+    return ESP_ERR_NO_MEM;
+  }
+  if (json::add(data.get(), "instance_name", config.instance_name) !=
+      ESP_OK) {
+    return ESP_ERR_NO_MEM;
+  }
+  if (json::add(data.get(), "service_type", config.service_type) !=
+      ESP_OK) {
+    return ESP_ERR_NO_MEM;
+  }
+  if (json::add(data.get(), "protocol", config.protocol) != ESP_OK) {
+    return ESP_ERR_NO_MEM;
+  }
+  if (!cJSON_AddNumberToObject(data.get(), "port",
+                               static_cast<int>(config.port))) {
+    return ESP_ERR_NO_MEM;
+  }
+  if (json::add(data.get(), "running", gateway->mdns_running) != ESP_OK) {
     return ESP_ERR_NO_MEM;
   }
 

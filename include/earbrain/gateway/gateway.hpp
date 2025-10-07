@@ -77,6 +77,7 @@ private:
   static esp_err_t handle_device_info_get(httpd_req_t *req);
   static esp_err_t handle_wifi_credentials_post(httpd_req_t *req);
   static esp_err_t handle_wifi_status_get(httpd_req_t *req);
+  static esp_err_t handle_mdns_get(httpd_req_t *req);
   static void ip_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data);
   static void wifi_event_handler(void *arg, esp_event_base_t event_base,
