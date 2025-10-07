@@ -14,7 +14,7 @@ struct esp_netif_obj;
 namespace earbrain {
 
 struct AccessPointConfig {
-  std::string ssid;
+  std::string ssid = "gateway-ap";
   uint8_t channel = 1;
   wifi_auth_mode_t auth_mode = WIFI_AUTH_OPEN;
   uint8_t max_connections = 4;
@@ -30,6 +30,7 @@ public:
   Gateway();
   ~Gateway();
 
+  esp_err_t start_access_point();
   esp_err_t start_access_point(const AccessPointConfig &config);
   esp_err_t stop_access_point();
   esp_err_t start_station(const StationConfig &config);

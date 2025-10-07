@@ -201,6 +201,10 @@ esp_err_t Gateway::start_access_point(const AccessPointConfig &config) {
   return ESP_OK;
 }
 
+esp_err_t Gateway::start_access_point() {
+  return start_access_point(ap_config);
+}
+
 esp_err_t Gateway::stop_access_point() {
   if (!ap_active) {
     return ESP_OK;
