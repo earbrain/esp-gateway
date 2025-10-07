@@ -79,16 +79,12 @@ static constexpr int sta_max_connect_retries = 5;
 
 static bool should_retry_reason(wifi_err_reason_t reason) {
   switch (reason) {
-  case WIFI_REASON_NO_AP_FOUND:
-  case WIFI_REASON_AUTH_EXPIRE:
-  case WIFI_REASON_AUTH_FAIL:
-  case WIFI_REASON_ASSOC_FAIL:
-  case WIFI_REASON_HANDSHAKE_TIMEOUT:
-  case WIFI_REASON_ASSOC_EXPIRE:
-  case WIFI_REASON_BEACON_TIMEOUT:
-    return true;
-  default:
+  case WIFI_REASON_AUTH_LEAVE:
+  case WIFI_REASON_ASSOC_LEAVE:
+  case WIFI_REASON_STA_LEAVING:
     return false;
+  default:
+    return true;
   }
 }
 
