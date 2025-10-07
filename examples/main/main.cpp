@@ -36,6 +36,18 @@ extern "C" void app_main(void) {
     return;
   }
 
+  earbrain::MdnsConfig mdns_cfg;
+  mdns_cfg.hostname = "esp-gateway";
+  mdns_cfg.instance_name = "ESP Gateway";
+  mdns_cfg.service_type = "_http";
+  mdns_cfg.protocol = "_tcp";
+  mdns_cfg.port = 80;
+
+  const esp_err_t mdns_err = gateway.start_mdns(mdns_cfg);
+  if (mdns_err != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to start mDNS: %s", esp_err_to_name(mdns_err));
+  }
+
   while (true) {
     vTaskDelay(pdMS_TO_TICKS(1000));
   }

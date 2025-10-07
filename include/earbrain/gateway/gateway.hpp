@@ -31,6 +31,14 @@ struct StationConfig {
   std::string passphrase;
 };
 
+struct MdnsConfig {
+  std::string hostname = "esp-gateway";
+  std::string instance_name = "ESP Gateway";
+  std::string service_type = "_http";
+  std::string protocol = "_tcp";
+  uint16_t port = 80;
+};
+
 class Gateway {
 public:
   Gateway();
@@ -43,6 +51,9 @@ public:
   esp_err_t stop_station();
   esp_err_t start_server();
   esp_err_t stop_server();
+  esp_err_t start_mdns();
+  esp_err_t start_mdns(const MdnsConfig &config);
+  esp_err_t stop_mdns();
 
   void set_softap_ssid(std::string_view ssid);
 
@@ -79,6 +90,7 @@ private:
   esp_err_t ensure_wifi_initialized();
   esp_err_t register_wifi_event_handlers();
   esp_err_t apply_wifi_mode();
+  esp_err_t ensure_mdns_initialized();
   char softap_ssid[33];
   std::size_t softap_ssid_len;
   esp_netif_obj *softap_netif;
@@ -103,6 +115,12 @@ private:
   bool has_saved_sta_credentials;
   bool sta_credentials_loaded;
   bool sta_autoconnect_attempted;
+  MdnsConfig mdns_config;
+  bool mdns_initialized;
+  bool mdns_service_registered;
+  bool mdns_running;
+  std::string mdns_registered_service_type;
+  std::string mdns_registered_protocol;
 };
 
 } // namespace earbrain

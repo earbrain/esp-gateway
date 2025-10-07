@@ -32,6 +32,7 @@ idf_component_register(
         esp_event
         nvs_flash
         log
+        mdns
     EMBED_TXTFILES
         ${PORTAL_ASSETS}
 )
