@@ -18,7 +18,7 @@ endforeach()
 idf_component_register(
     SRCS
         "src/gateway.cpp"
-        "src/wifi_softap.cpp"
+        "src/wifi.cpp"
     INCLUDE_DIRS
         "include"
     PRIV_INCLUDE_DIRS
@@ -26,10 +26,10 @@ idf_component_register(
     REQUIRES
         esp_http_server
         json
+        esp_wifi
     PRIV_REQUIRES
         esp_netif
         esp_event
-        esp_wifi
         nvs_flash
         log
     EMBED_TXTFILES

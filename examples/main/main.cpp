@@ -22,9 +22,17 @@ extern "C" void app_main(void) {
 
   ESP_LOGI(TAG, "Gateway version: %s", gateway.version());
 
-  ESP_LOGI(TAG, "Gateway start");
-  if (gateway.start() != ESP_OK) {
-    ESP_LOGE(TAG, "Gateway start failed");
+  ESP_LOGI(TAG, "Starting access point");
+  earbrain::AccessPointConfig ap_cfg;
+  ap_cfg.ssid = "gateway-ap";
+  if (gateway.start_access_point(ap_cfg) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to start access point");
+    return;
+  }
+
+  ESP_LOGI(TAG, "Starting HTTP server");
+  if (gateway.start_server() != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to start HTTP server");
     return;
   }
 
