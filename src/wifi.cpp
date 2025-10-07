@@ -125,6 +125,13 @@ esp_err_t Gateway::ensure_wifi_initialized() {
     wifi_initialized = true;
   }
 
+  if (!sta_credentials_loaded) {
+    err = load_wifi_credentials();
+    if (err != ESP_OK) {
+      return err;
+    }
+  }
+
   err = register_wifi_event_handlers();
   if (err != ESP_OK) {
     return err;
@@ -228,6 +235,7 @@ esp_err_t Gateway::start_access_point(const AccessPointConfig &config) {
 
   ap_config = config;
   ESP_LOGI(wifi_tag, "Access point enabled: %s", ap_config.ssid.c_str());
+  start_station_with_saved_profile();
   return ESP_OK;
 }
 
@@ -381,6 +389,103 @@ void Gateway::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
       static_cast<wifi_err_reason_t>(event.reason);
   sta_ip.addr = 0;
   ESP_LOGW(wifi_tag, "Station disconnected (reason=%d)", event.reason);
+}
+
+esp_err_t Gateway::load_wifi_credentials() {
+  nvs_handle_t handle = 0;
+  esp_err_t err = nvs_open(wifi_nvs_namespace, NVS_READONLY, &handle);
+  if (err == ESP_ERR_NVS_NOT_FOUND) {
+    saved_sta_config = StationConfig{};
+    has_saved_sta_credentials = false;
+    sta_credentials_loaded = true;
+    ESP_LOGI(wifi_tag, "No saved Wi-Fi credentials found");
+    return ESP_OK;
+  }
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  size_t ssid_len = 0;
+  err = nvs_get_str(handle, wifi_nvs_ssid_key, nullptr, &ssid_len);
+  if (err == ESP_ERR_NVS_NOT_FOUND || ssid_len <= 1) {
+    saved_sta_config = StationConfig{};
+    has_saved_sta_credentials = false;
+    sta_credentials_loaded = true;
+    nvs_close(handle);
+    ESP_LOGI(wifi_tag, "No saved Wi-Fi credentials found");
+    return ESP_OK;
+  }
+  if (err != ESP_OK) {
+    nvs_close(handle);
+    return err;
+  }
+
+  std::string ssid_value;
+  ssid_value.resize(ssid_len);
+  err = nvs_get_str(handle, wifi_nvs_ssid_key, ssid_value.data(), &ssid_len);
+  if (err != ESP_OK) {
+    nvs_close(handle);
+    return err;
+  }
+  if (ssid_len > 0 && ssid_value[ssid_len - 1] == '\0') {
+    ssid_value.resize(ssid_len - 1);
+  } else {
+    ssid_value.resize(ssid_len);
+  }
+
+  size_t pass_len = 0;
+  err = nvs_get_str(handle, wifi_nvs_pass_key, nullptr, &pass_len);
+  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+    nvs_close(handle);
+    return err;
+  }
+
+  std::string pass_value;
+  if (err != ESP_ERR_NVS_NOT_FOUND && pass_len > 0) {
+    pass_value.resize(pass_len);
+    err = nvs_get_str(handle, wifi_nvs_pass_key, pass_value.data(), &pass_len);
+    if (err != ESP_OK) {
+      nvs_close(handle);
+      return err;
+    }
+    if (pass_len > 0 && pass_value[pass_len - 1] == '\0') {
+      pass_value.resize(pass_len - 1);
+    } else {
+      pass_value.resize(pass_len);
+    }
+  }
+
+  nvs_close(handle);
+
+  saved_sta_config.ssid = std::move(ssid_value);
+  saved_sta_config.passphrase = std::move(pass_value);
+  has_saved_sta_credentials = !saved_sta_config.ssid.empty();
+  sta_credentials_loaded = true;
+
+  if (has_saved_sta_credentials) {
+    ESP_LOGI(wifi_tag, "Loaded saved Wi-Fi credentials for SSID: %s",
+             saved_sta_config.ssid.c_str());
+  }
+
+  return ESP_OK;
+}
+
+void Gateway::start_station_with_saved_profile() {
+  if (sta_autoconnect_attempted) {
+    return;
+  }
+  sta_autoconnect_attempted = true;
+
+  if (!has_saved_sta_credentials || saved_sta_config.ssid.empty()) {
+    return;
+  }
+
+  ESP_LOGI(wifi_tag, "Attempting auto-connect to saved SSID: %s", saved_sta_config.ssid.c_str());
+  StationConfig cfg = saved_sta_config;
+  const esp_err_t err = start_station(cfg);
+  if (err != ESP_OK) {
+    ESP_LOGW(wifi_tag, "Auto station connect failed: %s", esp_err_to_name(err));
+  }
 }
 
 } // namespace earbrain

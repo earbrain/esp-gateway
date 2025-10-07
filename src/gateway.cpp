@@ -42,10 +42,6 @@ static constexpr auto html_content_type = "text/html; charset=utf-8";
 static constexpr auto js_content_type = "application/javascript";
 static constexpr auto css_content_type = "text/css";
 static constexpr size_t max_request_body_size = 1024;
-static constexpr const char wifi_nvs_namespace[] = "wifi";
-static constexpr const char wifi_nvs_ssid_key[] = "sta_ssid";
-static constexpr const char wifi_nvs_pass_key[] = "sta_pass";
-
 static bool is_valid_passphrase(std::string_view passphrase) {
   const std::size_t len = passphrase.size();
   if (len >= 8 && len <= 63) {
@@ -139,7 +135,8 @@ Gateway::Gateway()
     wifi_handlers_registered(false), builtin_routes_registered(false),
     routes(), sta_connecting(false), sta_connected(false), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
-    sta_last_error(ESP_OK) {
+    sta_last_error(ESP_OK), saved_sta_config{}, has_saved_sta_credentials(false),
+    sta_credentials_loaded(false), sta_autoconnect_attempted(false) {
   set_softap_ssid("gateway-ap"sv);
 }
 
@@ -269,6 +266,7 @@ esp_err_t Gateway::start_http_server() {
   }
 
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+  config.max_uri_handlers = 16;
   config.lru_purge_enable = true;
 
   esp_err_t err = httpd_start(&http_server, &config);
@@ -413,6 +411,7 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
   } else {
     ESP_LOGE("gateway", "Failed to start station: %s", esp_err_to_name(sta_err));
   }
+  gateway->sta_autoconnect_attempted = true;
 
   auto data = json::object();
   if (!data) {
@@ -482,6 +481,13 @@ esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
   }
 
   nvs_close(handle);
+  if (err == ESP_OK) {
+    saved_sta_config.ssid.assign(ssid.data(), ssid.size());
+    saved_sta_config.passphrase.assign(passphrase.data(), passphrase.size());
+    has_saved_sta_credentials = !saved_sta_config.ssid.empty();
+    sta_credentials_loaded = true;
+    sta_autoconnect_attempted = false;
+  }
   return err;
 }
 
