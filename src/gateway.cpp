@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -11,9 +12,11 @@
 #include <vector>
 
 #include "earbrain/gateway/device_info.hpp"
+#include "earbrain/gateway/logging.hpp"
 #include "json/device_info.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
+#include "json/log_entries.hpp"
 #include "json/wifi_credentials.hpp"
 #include "json/wifi_status.hpp"
 #include "esp_chip_info.h"
@@ -223,6 +226,7 @@ void Gateway::ensure_builtin_routes() {
        &Gateway::handle_wifi_credentials_post},
       {"/api/v1/wifi/status", HTTP_GET, &Gateway::handle_wifi_status_get},
       {"/api/v1/mdns", HTTP_GET, &Gateway::handle_mdns_get},
+      {"/api/v1/logs", HTTP_GET, &Gateway::handle_logs_get},
   };
 
   for (const auto &route : routes_to_register) {
@@ -230,16 +234,16 @@ void Gateway::ensure_builtin_routes() {
     err = add_route(route.uri, route.method, route.handler, this);
 
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-      ESP_LOGW("gateway", "Failed to register builtin route %.*s: %s",
-               static_cast<int>(route.uri.size()), route.uri.data(),
-               esp_err_to_name(err));
+      logging::warnf("gateway", "Failed to register builtin route %.*s: %s",
+                     static_cast<int>(route.uri.size()), route.uri.data(),
+                     esp_err_to_name(err));
     }
   }
 }
 
 esp_err_t Gateway::start_server() {
   if (server_running) {
-    ESP_LOGI("gateway", "Server already running");
+    logging::info("Server already running", "gateway");
     return ESP_OK;
   }
 
@@ -251,14 +255,14 @@ esp_err_t Gateway::start_server() {
   }
 
   server_running = true;
-  ESP_LOGI("gateway", "HTTP server started");
+  logging::info("HTTP server started", "gateway");
 
   return ESP_OK;
 }
 
 esp_err_t Gateway::stop_server() {
   if (!server_running) {
-    ESP_LOGI("gateway", "Server already stopped");
+    logging::info("Server already stopped", "gateway");
     return ESP_OK;
   }
 
@@ -271,7 +275,7 @@ esp_err_t Gateway::stop_server() {
   }
 
   server_running = false;
-  ESP_LOGI("gateway", "HTTP server stopped");
+  logging::info("HTTP server stopped", "gateway");
   return ESP_OK;
 }
 
@@ -395,24 +399,27 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     return http::send_fail_field(req, "passphrase", "Passphrase must be 8-63 chars or 64 hex.");
   }
 
-  ESP_LOGI("gateway", "Received Wi-Fi credentials update for SSID: %s", credentials.ssid.c_str());
+  logging::infof("gateway", "Received Wi-Fi credentials update for SSID: %s",
+                 credentials.ssid.c_str());
 
   const esp_err_t result = gateway->save_wifi_credentials(credentials.ssid, credentials.passphrase);
 
   if (result != ESP_OK) {
-    ESP_LOGE("gateway", "Failed to save Wi-Fi credentials: %s", esp_err_to_name(result));
+    logging::errorf("gateway", "Failed to save Wi-Fi credentials: %s",
+                    esp_err_to_name(result));
     return http::send_error(req, "Failed to save credentials.", esp_err_to_name(result));
   }
 
-  ESP_LOGI("gateway", "Wi-Fi credentials saved. Preparing to start station");
+  logging::info("Wi-Fi credentials saved. Preparing to start station",
+                "gateway");
 
   esp_err_t sta_err = ESP_OK;
   bool sta_started = false;
 
   const esp_err_t stop_err = gateway->stop_station();
   if (stop_err != ESP_OK) {
-    ESP_LOGW("gateway", "Failed to stop existing station: %s",
-             esp_err_to_name(stop_err));
+    logging::warnf("gateway", "Failed to stop existing station: %s",
+                   esp_err_to_name(stop_err));
   }
 
   StationConfig station_cfg{};
@@ -422,10 +429,11 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
   sta_err = gateway->start_station(station_cfg);
   if (sta_err == ESP_OK) {
     sta_started = true;
-    ESP_LOGI("gateway", "Station connection initiated for SSID: %s",
-             station_cfg.ssid.c_str());
+    logging::infof("gateway", "Station connection initiated for SSID: %s",
+                   station_cfg.ssid.c_str());
   } else {
-    ESP_LOGE("gateway", "Failed to start station: %s", esp_err_to_name(sta_err));
+    logging::errorf("gateway", "Failed to start station: %s",
+                    esp_err_to_name(sta_err));
   }
   gateway->sta_autoconnect_attempted = true;
 
@@ -509,6 +517,48 @@ esp_err_t Gateway::handle_mdns_get(httpd_req_t *req) {
   }
   if (json::add(data.get(), "running", gateway->mdns_running) != ESP_OK) {
     return ESP_ERR_NO_MEM;
+  }
+
+  return http::send_success(req, std::move(data));
+}
+
+esp_err_t Gateway::handle_logs_get(httpd_req_t *req) {
+  uint64_t cursor = 0;
+  std::size_t limit = 100;
+
+  const size_t query_len = httpd_req_get_url_query_len(req);
+  if (query_len > 0 && query_len < 256) {
+    std::string query(query_len + 1, '\0');
+    if (httpd_req_get_url_query_str(req, query.data(), query.size()) == ESP_OK) {
+      char buffer[32] = {0};
+
+      if (httpd_query_key_value(query.c_str(), "cursor", buffer,
+                                sizeof(buffer)) == ESP_OK) {
+        char *end = nullptr;
+        const unsigned long long parsed = strtoull(buffer, &end, 10);
+        if (end && end != buffer) {
+          cursor = parsed;
+        }
+      }
+
+      if (httpd_query_key_value(query.c_str(), "limit", buffer,
+                                sizeof(buffer)) == ESP_OK) {
+        char *end = nullptr;
+        const unsigned long parsed = strtoul(buffer, &end, 10);
+        if (end && end != buffer) {
+          constexpr std::size_t kMaxLimit = logging::LogStore::max_entries;
+          const std::size_t requested = static_cast<std::size_t>(parsed);
+          limit =
+              std::clamp<std::size_t>(requested, std::size_t{1}, kMaxLimit);
+        }
+      }
+    }
+  }
+
+  const logging::LogBatch batch = logging::collect(cursor, limit);
+  auto data = json_model::to_json(batch);
+  if (!data) {
+    return http::send_error(req, "Failed to encode log entries");
   }
 
   return http::send_success(req, std::move(data));
@@ -645,10 +695,13 @@ esp_err_t Gateway::start_mdns(const MdnsConfig &config) {
   mdns_registered_protocol = mdns_config.protocol;
   mdns_running = true;
 
-  ESP_LOGI("gateway", "mDNS started: host=%s instance=%s service=%s protocol=%s port=%u",
-           mdns_config.hostname.c_str(), mdns_config.instance_name.c_str(),
-           mdns_config.service_type.c_str(), mdns_config.protocol.c_str(),
-           static_cast<unsigned>(mdns_config.port));
+  logging::infof("gateway",
+                 "mDNS started: host=%s instance=%s service=%s protocol=%s port=%u",
+                 mdns_config.hostname.c_str(),
+                 mdns_config.instance_name.c_str(),
+                 mdns_config.service_type.c_str(),
+                 mdns_config.protocol.c_str(),
+                 static_cast<unsigned>(mdns_config.port));
 
   return ESP_OK;
 }

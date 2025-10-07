@@ -1,7 +1,9 @@
 #include "earbrain/gateway/gateway.hpp"
+#include "earbrain/gateway/logging.hpp"
 
 #include <algorithm>
 #include <cctype>
+#include <string>
 #include <string_view>
 
 #include "esp_event.h"
@@ -225,7 +227,8 @@ esp_err_t Gateway::start_access_point(const AccessPointConfig &config) {
   }
 
   ap_config = config;
-  ESP_LOGI(wifi_tag, "Access point enabled: %s", ap_config.ssid.c_str());
+  logging::infof(wifi_tag, "Access point enabled: %s",
+                 ap_config.ssid.c_str());
   start_station_with_saved_profile();
   return ESP_OK;
 }
@@ -246,7 +249,7 @@ esp_err_t Gateway::stop_access_point() {
     return err;
   }
 
-  ESP_LOGI(wifi_tag, "Access point stopped");
+  logging::info("Access point stopped", wifi_tag);
   return ESP_OK;
 }
 
@@ -298,7 +301,8 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
   sta_last_error = ESP_OK;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
   sta_ip.addr = 0;
-  ESP_LOGI(wifi_tag, "Station connection started: %s", sta_config.ssid.c_str());
+  logging::infof(wifi_tag, "Station connection started: %s",
+                 sta_config.ssid.c_str());
   return ESP_OK;
 }
 
@@ -329,7 +333,7 @@ esp_err_t Gateway::stop_station() {
   sta_last_error = ESP_OK;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
   sta_ip.addr = 0;
-  ESP_LOGI(wifi_tag, "Station stopped");
+  logging::info("Station stopped", wifi_tag);
   return ESP_OK;
 }
 
@@ -370,7 +374,7 @@ void Gateway::on_sta_got_ip(const ip_event_got_ip_t &event) {
   const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&sta_ip);
   char ip_buffer[16] = {0};
   ip4addr_ntoa_r(ip4, ip_buffer, sizeof(ip_buffer));
-  ESP_LOGI(wifi_tag, "Station got IP: %s", ip_buffer);
+  logging::infof(wifi_tag, "Station got IP: %s", ip_buffer);
 }
 
 void Gateway::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
@@ -379,7 +383,8 @@ void Gateway::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
   sta_last_disconnect_reason =
       static_cast<wifi_err_reason_t>(event.reason);
   sta_ip.addr = 0;
-  ESP_LOGW(wifi_tag, "Station disconnected (reason=%d)", event.reason);
+  logging::warnf(wifi_tag, "Station disconnected (reason=%d)",
+                 static_cast<int>(event.reason));
 }
 
 esp_err_t Gateway::load_wifi_credentials() {
@@ -389,7 +394,7 @@ esp_err_t Gateway::load_wifi_credentials() {
     saved_sta_config = StationConfig{};
     has_saved_sta_credentials = false;
     sta_credentials_loaded = true;
-    ESP_LOGI(wifi_tag, "No saved Wi-Fi credentials found");
+    logging::info("No saved Wi-Fi credentials found", wifi_tag);
     return ESP_OK;
   }
   if (err != ESP_OK) {
@@ -403,7 +408,7 @@ esp_err_t Gateway::load_wifi_credentials() {
     has_saved_sta_credentials = false;
     sta_credentials_loaded = true;
     nvs_close(handle);
-    ESP_LOGI(wifi_tag, "No saved Wi-Fi credentials found");
+    logging::info("No saved Wi-Fi credentials found", wifi_tag);
     return ESP_OK;
   }
   if (err != ESP_OK) {
@@ -454,8 +459,8 @@ esp_err_t Gateway::load_wifi_credentials() {
   sta_credentials_loaded = true;
 
   if (has_saved_sta_credentials) {
-    ESP_LOGI(wifi_tag, "Loaded saved Wi-Fi credentials for SSID: %s",
-             saved_sta_config.ssid.c_str());
+    logging::infof(wifi_tag, "Loaded saved Wi-Fi credentials for SSID: %s",
+                   saved_sta_config.ssid.c_str());
   }
 
   return ESP_OK;
@@ -471,11 +476,13 @@ void Gateway::start_station_with_saved_profile() {
     return;
   }
 
-  ESP_LOGI(wifi_tag, "Attempting auto-connect to saved SSID: %s", saved_sta_config.ssid.c_str());
+  logging::infof(wifi_tag, "Attempting auto-connect to saved SSID: %s",
+                 saved_sta_config.ssid.c_str());
   StationConfig cfg = saved_sta_config;
   const esp_err_t err = start_station(cfg);
   if (err != ESP_OK) {
-    ESP_LOGW(wifi_tag, "Auto station connect failed: %s", esp_err_to_name(err));
+    logging::warnf(wifi_tag, "Auto station connect failed: %s",
+                   esp_err_to_name(err));
   }
 }
 
