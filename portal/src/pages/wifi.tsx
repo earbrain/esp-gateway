@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import type { FunctionalComponent } from "preact";
 import { useApi } from "../hooks/useApi";
 import { usePolling } from "../hooks/usePolling";
-import { Toast } from "../components/toast";
-import { WifiStatusCard } from "../components/wifiStatusCard";
+import { Toast } from "../components/Toast";
+import { WifiStatusCard } from "../components/WifiStatusCard";
 
 type WifiPageProps = {
   path?: string;

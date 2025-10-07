@@ -1,7 +1,7 @@
 import Router, { route, type RouterOnChangeArgs } from "preact-router";
 import { useEffect, useRef, useState } from "preact/hooks";
 
-import { BreadcrumbSection, type PageMeta } from "./components/breadcrumb";
+import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
 import { HomePage } from "./pages/home";
 import { DevicePage } from "./pages/device";
 import { WifiPage } from "./pages/wifi";
