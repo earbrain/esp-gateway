@@ -39,7 +39,6 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
   });
   const [validationError, setValidationError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [settingsVisible, setSettingsVisible] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
   const { execute, loading, error, reset } = useApi<WifiResponse>("/api/v1/wifi/credentials", {
@@ -239,63 +238,50 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
         </div>
       )}
       <section class="space-y-6">
-        <div class="flex justify-end">
-          <button
-            type="button"
-            class="btn-secondary"
-            onClick={() => setSettingsVisible((prev) => !prev)}
-            aria-expanded={settingsVisible}
-            aria-controls="wifi-settings-panel"
-          >
-            {settingsVisible ? "Hide Wi-Fi settings" : "Show Wi-Fi settings"}
-          </button>
+        <div class="card" id="wifi-settings-panel">
+          <h2 class="section-title">Update Credentials</h2>
+          <form class="grid gap-4" onSubmit={handleSubmit}>
+            <label class="form-field">
+              <span>SSID</span>
+              <input
+                type="text"
+                value={values.ssid}
+                onInput={handleInputChange("ssid")}
+                placeholder="e.g. gateway-ap"
+                required
+                class="input"
+              />
+            </label>
+            <label class="form-field">
+              <span>Password</span>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={values.passphrase}
+                onInput={handleInputChange("passphrase")}
+                placeholder="8-63 chars or 64-digit hex"
+                minLength={8}
+                maxLength={64}
+                required
+                class="input"
+              />
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={showPassword}
+                onChange={() => setShowPassword((prev) => !prev)}
+                class="h-4 w-4"
+              />
+              Show password
+            </label>
+            <div class="flex items-center justify-end">
+              <button type="submit" disabled={loading} class="btn-primary">
+                {loading ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </form>
+          {validationError && <p class="error-text">{validationError}</p>}
         </div>
-        {settingsVisible && (
-          <div class="card" id="wifi-settings-panel">
-            <h2 class="section-title">Update Credentials</h2>
-            <form class="grid gap-4" onSubmit={handleSubmit}>
-              <label class="form-field">
-                <span>SSID</span>
-                <input
-                  type="text"
-                  value={values.ssid}
-                  onInput={handleInputChange("ssid")}
-                  placeholder="e.g. gateway-ap"
-                  required
-                  class="input"
-                />
-              </label>
-              <label class="form-field">
-                <span>Password</span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={values.passphrase}
-                  onInput={handleInputChange("passphrase")}
-                  placeholder="8-63 chars or 64-digit hex"
-                  minLength={8}
-                  maxLength={64}
-                  required
-                  class="input"
-                />
-              </label>
-              <label class="flex items-center gap-2 text-sm text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={showPassword}
-                  onChange={() => setShowPassword((prev) => !prev)}
-                  class="h-4 w-4"
-                />
-                Show password
-              </label>
-              <div class="flex items-center justify-end">
-                <button type="submit" disabled={loading} class="btn-primary">
-                  {loading ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
-            {validationError && <p class="error-text">{validationError}</p>}
-          </div>
-        )}
         <WifiStatusCard
           apState={apState}
           staState={staState}
