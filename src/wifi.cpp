@@ -406,6 +406,7 @@ void Gateway::wifi_event_handler(void *arg, esp_event_base_t event_base,
 void Gateway::on_sta_got_ip(const ip_event_got_ip_t &event) {
   sta_connecting = false;
   sta_connected = true;
+  sta_retry_count = 0;
   sta_last_error = ESP_OK;
   sta_ip = event.ip_info.ip;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
