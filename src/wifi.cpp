@@ -7,9 +7,11 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_netif_ip_addr.h"
 #include "esp_wifi.h"
 #include "esp_wifi_default.h"
 #include "nvs_flash.h"
+#include "lwip/ip4_addr.h"
 
 namespace earbrain {
 
@@ -123,6 +125,34 @@ esp_err_t Gateway::ensure_wifi_initialized() {
     wifi_initialized = true;
   }
 
+  err = register_wifi_event_handlers();
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  return ESP_OK;
+}
+
+esp_err_t Gateway::register_wifi_event_handlers() {
+  if (wifi_handlers_registered) {
+    return ESP_OK;
+  }
+
+  esp_err_t err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
+                                             &Gateway::ip_event_handler, this);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    return err;
+  }
+
+  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED,
+                                   &Gateway::wifi_event_handler, this);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP,
+                                 &Gateway::ip_event_handler);
+    return err;
+  }
+
+  wifi_handlers_registered = true;
   return ESP_OK;
 }
 
@@ -224,11 +254,13 @@ esp_err_t Gateway::stop_access_point() {
 esp_err_t Gateway::start_station(const StationConfig &config) {
   if (!is_valid_ssid(config.ssid) ||
       !is_valid_passphrase_local(config.passphrase)) {
+    sta_last_error = ESP_ERR_INVALID_ARG;
     return ESP_ERR_INVALID_ARG;
   }
 
   esp_err_t err = ensure_wifi_initialized();
   if (err != ESP_OK) {
+    sta_last_error = err;
     return err;
   }
 
@@ -239,12 +271,14 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
 
   err = esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
   if (err != ESP_OK) {
+    sta_last_error = err;
     sta_active = previous_state;
     return err;
   }
 
   err = apply_wifi_mode();
   if (err != ESP_OK) {
+    sta_last_error = err;
     sta_active = previous_state;
     apply_wifi_mode();
     return err;
@@ -252,12 +286,18 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
 
   err = esp_wifi_connect();
   if (err != ESP_OK && err != ESP_ERR_WIFI_CONN) {
+    sta_last_error = err;
     sta_active = previous_state;
     apply_wifi_mode();
     return err;
   }
 
   sta_config = config;
+  sta_connecting = true;
+  sta_connected = false;
+  sta_last_error = ESP_OK;
+  sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
+  sta_ip.addr = 0;
   ESP_LOGI(wifi_tag, "Station connection started: %s", sta_config.ssid.c_str());
   return ESP_OK;
 }
@@ -270,6 +310,7 @@ esp_err_t Gateway::stop_station() {
   esp_err_t err = esp_wifi_disconnect();
   if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_INIT &&
       err != ESP_ERR_WIFI_NOT_STARTED && err != ESP_ERR_WIFI_NOT_CONNECT) {
+    sta_last_error = err;
     return err;
   }
 
@@ -279,11 +320,66 @@ esp_err_t Gateway::stop_station() {
   err = apply_wifi_mode();
   if (err != ESP_OK) {
     sta_active = previous_state;
+    sta_last_error = err;
     return err;
   }
 
+  sta_connecting = false;
+  sta_connected = false;
+  sta_last_error = ESP_OK;
+  sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
+  sta_ip.addr = 0;
   ESP_LOGI(wifi_tag, "Station stopped");
   return ESP_OK;
+}
+
+void Gateway::ip_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data) {
+  if (event_base != IP_EVENT || event_id != IP_EVENT_STA_GOT_IP || !event_data) {
+    return;
+  }
+  auto *gateway = static_cast<Gateway *>(arg);
+  if (!gateway) {
+    return;
+  }
+  const auto *event = static_cast<ip_event_got_ip_t *>(event_data);
+  gateway->on_sta_got_ip(*event);
+}
+
+void Gateway::wifi_event_handler(void *arg, esp_event_base_t event_base,
+                                 int32_t event_id, void *event_data) {
+  if (event_base != WIFI_EVENT || event_id != WIFI_EVENT_STA_DISCONNECTED ||
+      !event_data) {
+    return;
+  }
+  auto *gateway = static_cast<Gateway *>(arg);
+  if (!gateway) {
+    return;
+  }
+  const auto *event = static_cast<wifi_event_sta_disconnected_t *>(event_data);
+  gateway->on_sta_disconnected(*event);
+}
+
+void Gateway::on_sta_got_ip(const ip_event_got_ip_t &event) {
+  sta_connecting = false;
+  sta_connected = true;
+  sta_last_error = ESP_OK;
+  sta_ip = event.ip_info.ip;
+  sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
+
+  const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&sta_ip);
+  char ip_buffer[16] = {0};
+  ip4addr_ntoa_r(ip4, ip_buffer, sizeof(ip_buffer));
+  ESP_LOGI(wifi_tag, "Station got IP: %s", ip_buffer);
+}
+
+void Gateway::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
+  sta_connecting = false;
+  sta_connected = false;
+  sta_last_disconnect_reason =
+      static_cast<wifi_err_reason_t>(event.reason);
+  sta_ip.addr = 0;
+  ESP_LOGW(wifi_tag, "Station disconnected (reason=%d)", event.reason);
 }
 
 } // namespace earbrain

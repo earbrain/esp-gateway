@@ -2,6 +2,8 @@
 
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include "esp_netif_ip_addr.h"
+#include "esp_netif_types.h"
 #include "esp_wifi_types.h"
 #include <cstddef>
 #include <memory>
@@ -59,9 +61,17 @@ private:
   static esp_err_t handle_assets_css_get(httpd_req_t *req);
   static esp_err_t handle_device_info_get(httpd_req_t *req);
   static esp_err_t handle_wifi_credentials_post(httpd_req_t *req);
+  static esp_err_t handle_wifi_status_get(httpd_req_t *req);
+  static void ip_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data);
+  static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                                 int32_t event_id, void *event_data);
+  void on_sta_got_ip(const ip_event_got_ip_t& event);
+  void on_sta_disconnected(const wifi_event_sta_disconnected_t &event);
   esp_err_t save_wifi_credentials(std::string_view ssid,
                                   std::string_view passphrase);
   esp_err_t ensure_wifi_initialized();
+  esp_err_t register_wifi_event_handlers();
   esp_err_t apply_wifi_mode();
   char softap_ssid[33];
   std::size_t softap_ssid_len;
@@ -77,8 +87,14 @@ private:
   bool wifi_started;
   bool ap_active;
   bool sta_active;
+  bool wifi_handlers_registered;
   bool builtin_routes_registered;
   std::vector<std::unique_ptr<UriHandler>> routes;
+  bool sta_connecting;
+  bool sta_connected;
+  esp_ip4_addr_t sta_ip;
+  wifi_err_reason_t sta_last_disconnect_reason;
+  esp_err_t sta_last_error;
 };
 
 } // namespace earbrain

@@ -15,6 +15,7 @@
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 #include "json/wifi_credentials.hpp"
+#include "json/wifi_status.hpp"
 #include "esp_chip_info.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -22,6 +23,7 @@
 #include "esp_wifi.h"
 #include "esp_wifi_default.h"
 #include "nvs_flash.h"
+#include "lwip/ip4_addr.h"
 
 extern "C" {
 extern const uint8_t _binary_index_html_start[];
@@ -134,7 +136,10 @@ Gateway::Gateway()
     sta_netif(nullptr), http_server(nullptr), server_running(false),
     event_loop_created(false), nvs_initialized(false), wifi_initialized(false),
     wifi_started(false), ap_active(false), sta_active(false),
-    builtin_routes_registered(false), routes() {
+    wifi_handlers_registered(false), builtin_routes_registered(false),
+    routes(), sta_connecting(false), sta_connected(false), sta_ip{},
+    sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
+    sta_last_error(ESP_OK) {
   set_softap_ssid("gateway-ap"sv);
 }
 
@@ -203,6 +208,7 @@ void Gateway::ensure_builtin_routes() {
       {"/api/v1/device-info", HTTP_GET, &Gateway::handle_device_info_get},
       {"/api/v1/wifi/credentials", HTTP_POST,
        &Gateway::handle_wifi_credentials_post},
+      {"/api/v1/wifi/status", HTTP_GET, &Gateway::handle_wifi_status_get},
   };
 
   for (const auto &route : routes_to_register) {
@@ -420,6 +426,34 @@ esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
     if (json::add(data.get(), "sta_error", esp_err_to_name(sta_err)) != ESP_OK) {
       return ESP_ERR_NO_MEM;
     }
+  }
+
+  return http::send_success(req, std::move(data));
+}
+
+esp_err_t Gateway::handle_wifi_status_get(httpd_req_t *req) {
+  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  if (!gateway) {
+    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+  }
+
+  WifiStatus status;
+  status.ap_active = gateway->ap_active;
+  status.sta_active = gateway->sta_active;
+  status.sta_connecting = gateway->sta_connecting;
+  status.sta_connected = gateway->sta_connected;
+  status.last_error = gateway->sta_last_error;
+  status.disconnect_reason = gateway->sta_last_disconnect_reason;
+
+  const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&gateway->sta_ip);
+  char ip_buffer[16] = {0};
+  if (gateway->sta_connected && ip4addr_ntoa_r(ip4, ip_buffer, sizeof(ip_buffer))) {
+    status.ip = ip_buffer;
+  }
+
+  auto data = json_model::to_json(status);
+  if (!data) {
+    return ESP_ERR_NO_MEM;
   }
 
   return http::send_success(req, std::move(data));
