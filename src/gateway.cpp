@@ -11,10 +11,10 @@
 #include <utility>
 #include <vector>
 
-#include "earbrain/gateway/device_info.hpp"
+#include "earbrain/gateway/device_detail.hpp"
 #include "earbrain/gateway/logging.hpp"
 #include "earbrain/gateway/metrics.hpp"
-#include "json/device_info.hpp"
+#include "json/device_detail.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 #include "json/log_entries.hpp"
@@ -345,13 +345,13 @@ esp_err_t Gateway::handle_device_info_get(httpd_req_t *req) {
   esp_chip_info_t chip_info{};
   esp_chip_info(&chip_info);
 
-  DeviceInfo device_info;
-  device_info.model = chip_model_string(chip_info);
-  device_info.firmware_version = gateway ? gateway->version() : "unknown";
-  device_info.build_time = build_timestamp;
-  device_info.idf_version = esp_get_idf_version();
+  DeviceDetail detail;
+  detail.model = chip_model_string(chip_info);
+  detail.firmware_version = gateway ? gateway->version() : "unknown";
+  detail.build_time = build_timestamp;
+  detail.idf_version = esp_get_idf_version();
 
-  auto data = json_model::to_json(device_info);
+  auto data = json_model::to_json(detail);
   if (!data) {
     return ESP_ERR_NO_MEM;
   }

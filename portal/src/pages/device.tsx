@@ -7,7 +7,7 @@ type DevicePageProps = {
   path?: string;
 };
 
-type DeviceInfo = {
+type DeviceDetail = {
   model: string;
   firmware_version: string;
   build_time: string;
@@ -49,7 +49,7 @@ type LogResponse = {
 };
 
 export const DevicePage: FunctionalComponent<DevicePageProps> = () => {
-  const { data: info, loading, error, execute } = useApi<DeviceInfo>("/api/v1/device-info");
+  const { data: info, loading, error, execute } = useApi<DeviceDetail>("/api/v1/device-info");
   const {
     data: metrics,
     loading: metricsLoading,
