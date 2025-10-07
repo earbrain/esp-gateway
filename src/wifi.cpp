@@ -75,7 +75,7 @@ static wifi_config_t make_sta_config(const StationConfig &config) {
   return cfg;
 }
 
-static constexpr int sta_max_connect_retries = 5;
+static constexpr int sta_max_connect_retries = 10;
 
 static bool should_retry_reason(wifi_err_reason_t reason) {
   switch (reason) {
