@@ -18,6 +18,7 @@ endforeach()
 idf_component_register(
     SRCS
         "src/gateway.cpp"
+        "src/handlers/device_info_handler.cpp"
         "src/logging.cpp"
         "src/wifi.cpp"
     INCLUDE_DIRS

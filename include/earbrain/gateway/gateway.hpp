@@ -77,7 +77,6 @@ private:
   static esp_err_t handle_root_get(httpd_req_t *req);
   static esp_err_t handle_app_js_get(httpd_req_t *req);
   static esp_err_t handle_assets_css_get(httpd_req_t *req);
-  static esp_err_t handle_device_info_get(httpd_req_t *req);
   static esp_err_t handle_metrics_get(httpd_req_t *req);
   static esp_err_t handle_wifi_credentials_post(httpd_req_t *req);
   static esp_err_t handle_wifi_status_get(httpd_req_t *req);

@@ -11,10 +11,9 @@
 #include <utility>
 #include <vector>
 
-#include "earbrain/gateway/device_detail.hpp"
+#include "earbrain/gateway/handlers/device_info_handler.hpp"
 #include "earbrain/gateway/logging.hpp"
 #include "earbrain/gateway/metrics.hpp"
-#include "json/device_detail.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 #include "json/log_entries.hpp"
@@ -22,7 +21,6 @@
 #include "json/wifi_credentials.hpp"
 #include "json/wifi_status.hpp"
 #include "json/wifi_scan.hpp"
-#include "esp_chip_info.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -66,29 +64,6 @@ static bool is_valid_passphrase(std::string_view passphrase) {
 
   return false;
 }
-
-static const char *chip_model_string(const esp_chip_info_t &info) {
-  switch (info.model) {
-  case CHIP_ESP32:
-    return "ESP32";
-  case CHIP_ESP32S2:
-    return "ESP32-S2";
-  case CHIP_ESP32S3:
-    return "ESP32-S3";
-  case CHIP_ESP32C3:
-    return "ESP32-C3";
-  case CHIP_ESP32C2:
-    return "ESP32-C2";
-  case CHIP_ESP32C6:
-    return "ESP32-C6";
-  case CHIP_ESP32H2:
-    return "ESP32-H2";
-  default:
-    return "Unknown";
-  }
-}
-
-static constexpr const char build_timestamp[] = __DATE__ " " __TIME__;
 
 constexpr const uint8_t *truncate_null_terminator(const uint8_t *begin,
                                                   const uint8_t *end) {
@@ -226,7 +201,7 @@ void Gateway::ensure_builtin_routes() {
       {"/device", HTTP_GET, &Gateway::handle_root_get},
       {"/app.js", HTTP_GET, &Gateway::handle_app_js_get},
       {"/assets/index.css", HTTP_GET, &Gateway::handle_assets_css_get},
-      {"/api/v1/device-info", HTTP_GET, &Gateway::handle_device_info_get},
+      {"/api/v1/device-info", HTTP_GET, &handlers::device_info::handle_get},
       {"/api/v1/metrics", HTTP_GET, &Gateway::handle_metrics_get},
       {"/api/v1/wifi/credentials", HTTP_POST,
        &Gateway::handle_wifi_credentials_post},
@@ -339,26 +314,6 @@ esp_err_t Gateway::handle_assets_css_get(httpd_req_t *req) {
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
   return send_embedded(req, ::_binary_index_css_start,
                        ::_binary_index_css_end);
-}
-
-esp_err_t Gateway::handle_device_info_get(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
-
-  esp_chip_info_t chip_info{};
-  esp_chip_info(&chip_info);
-
-  DeviceDetail detail;
-  detail.model = chip_model_string(chip_info);
-  detail.firmware_version = gateway ? gateway->version() : "unknown";
-  detail.build_time = build_timestamp;
-  detail.idf_version = esp_get_idf_version();
-
-  auto data = json_model::to_json(detail);
-  if (!data) {
-    return ESP_ERR_NO_MEM;
-  }
-
-  return http::send_success(req, std::move(data));
 }
 
 esp_err_t Gateway::handle_metrics_get(httpd_req_t *req) {
