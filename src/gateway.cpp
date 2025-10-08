@@ -21,6 +21,7 @@
 #include "json/metrics.hpp"
 #include "json/wifi_credentials.hpp"
 #include "json/wifi_status.hpp"
+#include "json/wifi_scan.hpp"
 #include "esp_chip_info.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -230,6 +231,7 @@ void Gateway::ensure_builtin_routes() {
       {"/api/v1/wifi/credentials", HTTP_POST,
        &Gateway::handle_wifi_credentials_post},
       {"/api/v1/wifi/status", HTTP_GET, &Gateway::handle_wifi_status_get},
+      {"/api/v1/wifi/scan", HTTP_GET, &Gateway::handle_wifi_scan_get},
       {"/api/v1/mdns", HTTP_GET, &Gateway::handle_mdns_get},
       {"/api/v1/logs", HTTP_GET, &Gateway::handle_logs_get},
   };
@@ -515,6 +517,26 @@ esp_err_t Gateway::handle_wifi_status_get(httpd_req_t *req) {
   }
 
   return http::send_success(req, std::move(data));
+}
+
+esp_err_t Gateway::handle_wifi_scan_get(httpd_req_t *req) {
+  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  if (!gateway) {
+    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+  }
+
+  WifiScanResult result = gateway->perform_wifi_scan();
+
+  if (result.error != ESP_OK) {
+    return http::send_error(req, "Wi-Fi scan failed", esp_err_to_name(result.error));
+  }
+
+  auto payload = json_model::to_json(result);
+  if (!payload) {
+    return ESP_ERR_NO_MEM;
+  }
+
+  return http::send_success(req, std::move(payload));
 }
 
 esp_err_t Gateway::handle_mdns_get(httpd_req_t *req) {

@@ -3,8 +3,11 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <string>
 #include <string_view>
+#include <vector>
+#include <utility>
 
 #include "esp_event.h"
 #include "esp_log.h"
@@ -22,6 +25,7 @@ static constexpr const char wifi_tag[] = "gateway";
 
 static constexpr uint8_t sta_listen_interval = 1;
 static constexpr int8_t sta_tx_power_qdbm = 78;
+
 static bool is_valid_ssid(std::string_view ssid) {
   return !ssid.empty() && ssid.size() <= 32;
 }
@@ -40,6 +44,24 @@ static bool is_valid_passphrase_local(std::string_view passphrase) {
     });
   }
   return false;
+}
+
+static int signal_quality_from_rssi(int32_t rssi) {
+  if (rssi <= -100) {
+    return 0;
+  }
+  if (rssi >= -50) {
+    return 100;
+  }
+  const int quality = 2 * (static_cast<int>(rssi) + 100);
+  return std::clamp(quality, 0, 100);
+}
+
+static std::string format_bssid(const uint8_t (&bssid)[6]) {
+  char buffer[18] = {0};
+  std::snprintf(buffer, sizeof(buffer), "%02X:%02X:%02X:%02X:%02X:%02X",
+                bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+  return std::string(buffer);
 }
 
 static wifi_config_t make_ap_config(const AccessPointConfig &config) {
@@ -405,16 +427,24 @@ void Gateway::ip_event_handler(void *arg, esp_event_base_t event_base,
 
 void Gateway::wifi_event_handler(void *arg, esp_event_base_t event_base,
                                  int32_t event_id, void *event_data) {
-  if (event_base != WIFI_EVENT || event_id != WIFI_EVENT_STA_DISCONNECTED ||
-      !event_data) {
+  if (event_base != WIFI_EVENT) {
     return;
   }
   auto *gateway = static_cast<Gateway *>(arg);
   if (!gateway) {
     return;
   }
-  const auto *event = static_cast<wifi_event_sta_disconnected_t *>(event_data);
-  gateway->on_sta_disconnected(*event);
+
+  switch (event_id) {
+  case WIFI_EVENT_STA_DISCONNECTED:
+    if (event_data) {
+      const auto *event = static_cast<wifi_event_sta_disconnected_t *>(event_data);
+      gateway->on_sta_disconnected(*event);
+    }
+    break;
+  default:
+    break;
+  }
 }
 
 void Gateway::on_sta_got_ip(const ip_event_got_ip_t &event) {
@@ -459,6 +489,109 @@ void Gateway::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
                    "Station retries exhausted after %d attempts",
                    sta_max_connect_retries);
   }
+}
+
+WifiScanResult Gateway::perform_wifi_scan() {
+  WifiScanResult result{};
+
+  esp_err_t err = ensure_wifi_initialized();
+  if (err != ESP_OK) {
+    result.error = err;
+    return result;
+  }
+
+  const bool previous_sta_active = sta_active;
+  if (!sta_active) {
+    sta_active = true;
+  }
+
+  err = apply_wifi_mode();
+  if (err != ESP_OK) {
+    if (!previous_sta_active) {
+      sta_active = false;
+      esp_err_t mode_err = apply_wifi_mode();
+      if (mode_err != ESP_OK) {
+        logging::warnf(wifi_tag, "Failed to restore AP-only mode after scan setup: %s",
+                       esp_err_to_name(mode_err));
+      }
+    }
+    result.error = err;
+    return result;
+  }
+
+  wifi_scan_config_t scan_cfg{};
+  scan_cfg.show_hidden = true;
+
+  err = esp_wifi_scan_start(&scan_cfg, true);
+  if (err != ESP_OK) {
+    if (!previous_sta_active) {
+      sta_active = false;
+      esp_err_t mode_err = apply_wifi_mode();
+      if (mode_err != ESP_OK) {
+        logging::warnf(wifi_tag, "Failed to restore AP-only mode after scan failure: %s",
+                       esp_err_to_name(mode_err));
+      }
+    }
+    result.error = err;
+    return result;
+  }
+
+  uint16_t ap_count = 0;
+  err = esp_wifi_scan_get_ap_num(&ap_count);
+  std::vector<wifi_ap_record_t> records;
+  if (err == ESP_OK && ap_count > 0) {
+    records.resize(ap_count);
+    err = esp_wifi_scan_get_ap_records(&ap_count, records.data());
+    if (err == ESP_OK) {
+      records.resize(ap_count);
+    } else {
+      records.clear();
+    }
+  }
+
+  if (!previous_sta_active) {
+    sta_active = false;
+    esp_err_t mode_err = apply_wifi_mode();
+    if (mode_err != ESP_OK) {
+      logging::warnf(wifi_tag, "Failed to restore AP-only mode after scan: %s",
+                     esp_err_to_name(mode_err));
+    }
+  }
+
+  if (err != ESP_OK) {
+    result.error = err;
+    return result;
+  }
+
+  result.networks.reserve(records.size());
+  const bool is_connected = sta_connected;
+  const std::string current_ssid = is_connected ? sta_config.ssid : std::string{};
+
+  for (const auto &record : records) {
+    const char *ssid_raw = reinterpret_cast<const char *>(record.ssid);
+    if (!ssid_raw || ssid_raw[0] == '\0') {
+      continue;
+    }
+
+    WifiNetworkSummary summary{};
+    summary.ssid = ssid_raw;
+    summary.bssid = format_bssid(record.bssid);
+    summary.rssi = record.rssi;
+    summary.signal = signal_quality_from_rssi(record.rssi);
+    summary.channel = record.primary;
+    summary.auth_mode = record.authmode;
+    summary.hidden = record.ssid[0] == '\0';
+    summary.connected = is_connected && !current_ssid.empty() && current_ssid == summary.ssid;
+    result.networks.push_back(std::move(summary));
+  }
+
+  std::sort(result.networks.begin(), result.networks.end(),
+            [](const WifiNetworkSummary &a, const WifiNetworkSummary &b) {
+              return a.signal > b.signal;
+            });
+
+  result.error = ESP_OK;
+  return result;
 }
 
 esp_err_t Gateway::load_wifi_credentials() {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "earbrain/gateway/wifi_scan.hpp"
+
 #include "esp_err.h"
 #include "esp_http_server.h"
 #include "esp_netif_ip_addr.h"
@@ -79,6 +81,7 @@ private:
   static esp_err_t handle_metrics_get(httpd_req_t *req);
   static esp_err_t handle_wifi_credentials_post(httpd_req_t *req);
   static esp_err_t handle_wifi_status_get(httpd_req_t *req);
+  static esp_err_t handle_wifi_scan_get(httpd_req_t *req);
   static esp_err_t handle_mdns_get(httpd_req_t *req);
   static esp_err_t handle_logs_get(httpd_req_t *req);
   static void ip_event_handler(void *arg, esp_event_base_t event_base,
@@ -95,6 +98,8 @@ private:
   esp_err_t register_wifi_event_handlers();
   esp_err_t apply_wifi_mode();
   esp_err_t ensure_mdns_initialized();
+  WifiScanResult perform_wifi_scan();
+
   char softap_ssid[33];
   std::size_t softap_ssid_len;
   esp_netif_obj *softap_netif;
