@@ -12,12 +12,11 @@
 #include <vector>
 
 #include "earbrain/gateway/handlers/device_handler.hpp"
+#include "earbrain/gateway/handlers/metrics_handler.hpp"
 #include "earbrain/gateway/logging.hpp"
-#include "earbrain/gateway/metrics.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 #include "json/log_entries.hpp"
-#include "json/metrics.hpp"
 #include "json/wifi_credentials.hpp"
 #include "json/wifi_status.hpp"
 #include "json/wifi_scan.hpp"
@@ -26,8 +25,6 @@
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "mdns.h"
-#include "esp_timer.h"
-#include "esp_heap_caps.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "lwip/ip4_addr.h"
@@ -202,7 +199,7 @@ void Gateway::ensure_builtin_routes() {
       {"/app.js", HTTP_GET, &Gateway::handle_app_js_get},
       {"/assets/index.css", HTTP_GET, &Gateway::handle_assets_css_get},
       {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
-      {"/api/v1/metrics", HTTP_GET, &Gateway::handle_metrics_get},
+      {"/api/v1/metrics", HTTP_GET, &handlers::metrics::handle_get},
       {"/api/v1/wifi/credentials", HTTP_POST, &Gateway::handle_wifi_credentials_post},
       {"/api/v1/wifi/status", HTTP_GET, &Gateway::handle_wifi_status_get},
       {"/api/v1/wifi/scan", HTTP_GET, &Gateway::handle_wifi_scan_get},
@@ -313,30 +310,6 @@ esp_err_t Gateway::handle_assets_css_get(httpd_req_t *req) {
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
   return send_embedded(req, ::_binary_index_css_start,
                        ::_binary_index_css_end);
-}
-
-esp_err_t Gateway::handle_metrics_get(httpd_req_t *req) {
-  Metrics metrics{};
-  metrics.heap_total =
-      static_cast<std::uint32_t>(heap_caps_get_total_size(MALLOC_CAP_8BIT));
-  metrics.heap_free =
-      static_cast<std::uint32_t>(heap_caps_get_free_size(MALLOC_CAP_8BIT));
-  metrics.heap_used = metrics.heap_total > metrics.heap_free
-                        ? metrics.heap_total - metrics.heap_free
-                        : 0;
-  metrics.heap_min_free = static_cast<std::uint32_t>(
-    heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT));
-  metrics.heap_largest_free_block = static_cast<std::uint32_t>(
-    heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-  metrics.timestamp_ms =
-      static_cast<std::uint64_t>(esp_timer_get_time() / 1000);
-
-  auto data = json_model::to_json(metrics);
-  if (!data) {
-    return ESP_ERR_NO_MEM;
-  }
-
-  return http::send_success(req, std::move(data));
 }
 
 esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
