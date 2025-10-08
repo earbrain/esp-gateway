@@ -49,7 +49,7 @@ type LogResponse = {
 };
 
 export const DevicePage: FunctionalComponent<DevicePageProps> = () => {
-  const { data: info, loading, error, execute } = useApi<DeviceDetail>("/api/v1/device-info");
+  const { data: info, loading, error, execute } = useApi<DeviceDetail>("/api/v1/device");
   const {
     data: metrics,
     loading: metricsLoading,

@@ -1,4 +1,4 @@
-#include "earbrain/gateway/handlers/device_info_handler.hpp"
+#include "earbrain/gateway/handlers/device_handler.hpp"
 
 #include <utility>
 
@@ -10,7 +10,7 @@
 #include "esp_chip_info.h"
 #include "esp_system.h"
 
-namespace earbrain::handlers::device_info {
+namespace earbrain::handlers::device {
 
 static const char *chip_model_string(const esp_chip_info_t &info) {
   switch (info.model) {
@@ -55,4 +55,4 @@ esp_err_t handle_get(httpd_req_t *req) {
   return http::send_success(req, std::move(data));
 }
 
-} // namespace earbrain::handlers::device_info
+} // namespace earbrain::handlers::device

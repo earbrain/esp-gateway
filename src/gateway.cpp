@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "earbrain/gateway/handlers/device_info_handler.hpp"
+#include "earbrain/gateway/handlers/device_handler.hpp"
 #include "earbrain/gateway/logging.hpp"
 #include "earbrain/gateway/metrics.hpp"
 #include "json/http_response.hpp"
@@ -201,7 +201,7 @@ void Gateway::ensure_builtin_routes() {
       {"/device", HTTP_GET, &Gateway::handle_root_get},
       {"/app.js", HTTP_GET, &Gateway::handle_app_js_get},
       {"/assets/index.css", HTTP_GET, &Gateway::handle_assets_css_get},
-      {"/api/v1/device-info", HTTP_GET, &handlers::device_info::handle_get},
+      {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
       {"/api/v1/metrics", HTTP_GET, &Gateway::handle_metrics_get},
       {"/api/v1/wifi/credentials", HTTP_POST,
        &Gateway::handle_wifi_credentials_post},
