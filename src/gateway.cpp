@@ -13,6 +13,7 @@
 
 #include "earbrain/gateway/handlers/device_handler.hpp"
 #include "earbrain/gateway/handlers/metrics_handler.hpp"
+#include "earbrain/gateway/handlers/portal_handler.hpp"
 #include "earbrain/gateway/logging.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
@@ -26,25 +27,12 @@
 #include "esp_wifi.h"
 #include "mdns.h"
 #include "nvs.h"
-#include "nvs_flash.h"
 #include "lwip/ip4_addr.h"
-
-extern "C" {
-extern const uint8_t _binary_index_html_start[];
-extern const uint8_t _binary_index_html_end[];
-extern const uint8_t _binary_app_js_start[];
-extern const uint8_t _binary_app_js_end[];
-extern const uint8_t _binary_index_css_start[];
-extern const uint8_t _binary_index_css_end[];
-}
 
 namespace earbrain {
 
 using namespace std::string_view_literals;
 
-static constexpr auto html_content_type = "text/html; charset=utf-8";
-static constexpr auto js_content_type = "application/javascript";
-static constexpr auto css_content_type = "text/css";
 static constexpr size_t max_request_body_size = 1024;
 
 static bool is_valid_passphrase(std::string_view passphrase) {
@@ -60,32 +48,6 @@ static bool is_valid_passphrase(std::string_view passphrase) {
   }
 
   return false;
-}
-
-constexpr const uint8_t *truncate_null_terminator(const uint8_t *begin,
-                                                  const uint8_t *end) {
-  return (begin != end && *(end - 1) == '\0') ? end - 1 : end;
-}
-
-static esp_err_t send_embedded(httpd_req_t *req, const uint8_t *begin,
-                               const uint8_t *end) {
-  end = truncate_null_terminator(begin, end);
-  static constexpr size_t chunk_size = 1024;
-  size_t remaining = static_cast<size_t>(end - begin);
-  const uint8_t *cursor = begin;
-
-  while (remaining > 0) {
-    const size_t to_send = remaining > chunk_size ? chunk_size : remaining;
-    const esp_err_t err = httpd_resp_send_chunk(
-        req, reinterpret_cast<const char *>(cursor), to_send);
-    if (err != ESP_OK) {
-      return err;
-    }
-    cursor += to_send;
-    remaining -= to_send;
-  }
-
-  return httpd_resp_send_chunk(req, nullptr, 0);
 }
 
 struct Gateway::UriHandler {
@@ -193,11 +155,11 @@ void Gateway::ensure_builtin_routes() {
   };
 
   static constexpr BuiltinRoute routes_to_register[] = {
-      {"/", HTTP_GET, &Gateway::handle_root_get},
-      {"/wifi", HTTP_GET, &Gateway::handle_root_get},
-      {"/device", HTTP_GET, &Gateway::handle_root_get},
-      {"/app.js", HTTP_GET, &Gateway::handle_app_js_get},
-      {"/assets/index.css", HTTP_GET, &Gateway::handle_assets_css_get},
+      {"/", HTTP_GET, &handlers::portal::handle_root_get},
+      {"/wifi", HTTP_GET, &handlers::portal::handle_root_get},
+      {"/device", HTTP_GET, &handlers::portal::handle_root_get},
+      {"/app.js", HTTP_GET, &handlers::portal::handle_app_js_get},
+      {"/assets/index.css", HTTP_GET, &handlers::portal::handle_assets_css_get},
       {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
       {"/api/v1/metrics", HTTP_GET, &handlers::metrics::handle_get},
       {"/api/v1/wifi/credentials", HTTP_POST, &Gateway::handle_wifi_credentials_post},
@@ -287,29 +249,6 @@ esp_err_t Gateway::start_http_server() {
   }
 
   return ESP_OK;
-}
-
-esp_err_t Gateway::handle_root_get(httpd_req_t *req) {
-  (void)static_cast<Gateway *>(req->user_ctx);
-  httpd_resp_set_type(req, html_content_type);
-  httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-  return send_embedded(req, ::_binary_index_html_start,
-                       ::_binary_index_html_end);
-}
-
-esp_err_t Gateway::handle_app_js_get(httpd_req_t *req) {
-  (void)static_cast<Gateway *>(req->user_ctx);
-  httpd_resp_set_type(req, js_content_type);
-  httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-  return send_embedded(req, ::_binary_app_js_start, ::_binary_app_js_end);
-}
-
-esp_err_t Gateway::handle_assets_css_get(httpd_req_t *req) {
-  (void)static_cast<Gateway *>(req->user_ctx);
-  httpd_resp_set_type(req, css_content_type);
-  httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-  return send_embedded(req, ::_binary_index_css_start,
-                       ::_binary_index_css_end);
 }
 
 esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {

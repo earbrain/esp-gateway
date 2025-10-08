@@ -74,9 +74,6 @@ private:
   void ensure_builtin_routes();
   esp_err_t register_route_with_server(UriHandler &route) const;
   bool has_route(std::string_view uri, httpd_method_t method) const;
-  static esp_err_t handle_root_get(httpd_req_t *req);
-  static esp_err_t handle_app_js_get(httpd_req_t *req);
-  static esp_err_t handle_assets_css_get(httpd_req_t *req);
   static esp_err_t handle_wifi_credentials_post(httpd_req_t *req);
   static esp_err_t handle_wifi_status_get(httpd_req_t *req);
   static esp_err_t handle_wifi_scan_get(httpd_req_t *req);
