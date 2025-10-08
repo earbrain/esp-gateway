@@ -60,6 +60,9 @@ public:
 
   void set_softap_ssid(std::string_view ssid);
 
+  const MdnsConfig &mdns_configuration() const noexcept { return mdns_config; }
+  bool mdns_is_running() const noexcept { return mdns_running; }
+
   using RequestHandler = esp_err_t (*)(httpd_req_t *);
 
   esp_err_t add_route(std::string_view uri, httpd_method_t method,
@@ -77,7 +80,6 @@ private:
   static esp_err_t handle_wifi_credentials_post(httpd_req_t *req);
   static esp_err_t handle_wifi_status_get(httpd_req_t *req);
   static esp_err_t handle_wifi_scan_get(httpd_req_t *req);
-  static esp_err_t handle_mdns_get(httpd_req_t *req);
   static esp_err_t handle_logs_get(httpd_req_t *req);
   static void ip_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data);

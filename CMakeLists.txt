@@ -20,6 +20,7 @@ idf_component_register(
         "src/gateway.cpp"
         "src/handlers/device_handler.cpp"
         "src/handlers/metrics_handler.cpp"
+        "src/handlers/mdns_handler.cpp"
         "src/handlers/portal_handler.cpp"
         "src/logging.cpp"
         "src/wifi.cpp"
