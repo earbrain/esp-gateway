@@ -4,7 +4,6 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
-#include <cstdlib>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -14,11 +13,11 @@
 #include "earbrain/gateway/handlers/device_handler.hpp"
 #include "earbrain/gateway/handlers/metrics_handler.hpp"
 #include "earbrain/gateway/handlers/mdns_handler.hpp"
+#include "earbrain/gateway/handlers/log_handler.hpp"
 #include "earbrain/gateway/handlers/portal_handler.hpp"
 #include "earbrain/gateway/logging.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
-#include "json/log_entries.hpp"
 #include "json/wifi_credentials.hpp"
 #include "json/wifi_status.hpp"
 #include "json/wifi_scan.hpp"
@@ -167,7 +166,7 @@ void Gateway::ensure_builtin_routes() {
       {"/api/v1/wifi/status", HTTP_GET, &Gateway::handle_wifi_status_get},
       {"/api/v1/wifi/scan", HTTP_GET, &Gateway::handle_wifi_scan_get},
       {"/api/v1/mdns", HTTP_GET, &handlers::mdns::handle_get},
-      {"/api/v1/logs", HTTP_GET, &Gateway::handle_logs_get},
+      {"/api/v1/logs", HTTP_GET, &handlers::logs::handle_get},
   };
 
   for (const auto &route : routes_to_register) {
@@ -404,48 +403,6 @@ esp_err_t Gateway::handle_wifi_scan_get(httpd_req_t *req) {
   }
 
   return http::send_success(req, std::move(payload));
-}
-
-esp_err_t Gateway::handle_logs_get(httpd_req_t *req) {
-  uint64_t cursor = 0;
-  std::size_t limit = 100;
-
-  const size_t query_len = httpd_req_get_url_query_len(req);
-  if (query_len > 0 && query_len < 256) {
-    std::string query(query_len + 1, '\0');
-    if (httpd_req_get_url_query_str(req, query.data(), query.size()) == ESP_OK) {
-      char buffer[32] = {0};
-
-      if (httpd_query_key_value(query.c_str(), "cursor", buffer,
-                                sizeof(buffer)) == ESP_OK) {
-        char *end = nullptr;
-        const unsigned long long parsed = strtoull(buffer, &end, 10);
-        if (end && end != buffer) {
-          cursor = parsed;
-        }
-      }
-
-      if (httpd_query_key_value(query.c_str(), "limit", buffer,
-                                sizeof(buffer)) == ESP_OK) {
-        char *end = nullptr;
-        const unsigned long parsed = strtoul(buffer, &end, 10);
-        if (end && end != buffer) {
-          constexpr std::size_t kMaxLimit = logging::LogStore::max_entries;
-          const std::size_t requested = static_cast<std::size_t>(parsed);
-          limit =
-              std::clamp<std::size_t>(requested, std::size_t{1}, kMaxLimit);
-        }
-      }
-    }
-  }
-
-  const logging::LogBatch batch = logging::collect(cursor, limit);
-  auto data = json_model::to_json(batch);
-  if (!data) {
-    return http::send_error(req, "Failed to encode log entries");
-  }
-
-  return http::send_success(req, std::move(data));
 }
 
 esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
