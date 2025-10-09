@@ -32,33 +32,12 @@ namespace earbrain {
 
 using namespace std::string_view_literals;
 
-struct Gateway::UriHandler {
-  UriHandler(std::string_view path, httpd_method_t m, RequestHandler h,
-             void *ctx)
-    : uri(path), method(m), handler(h), user_ctx(ctx), descriptor{} {
-    refresh_descriptor();
-  }
-
-  void refresh_descriptor() {
-    descriptor.uri = uri.c_str();
-    descriptor.method = method;
-    descriptor.handler = handler;
-    descriptor.user_ctx = user_ctx;
-  }
-
-  std::string uri;
-  httpd_method_t method;
-  RequestHandler handler;
-  void *user_ctx;
-  httpd_uri_t descriptor;
-};
-
 Gateway::Gateway()
   : softap_ssid{}, softap_ssid_len(0), softap_netif(nullptr),
-    sta_netif(nullptr), http_server(nullptr), server_running(false),
-    wifi_initialized(false), wifi_started(false), ap_active(false),
-    sta_active(false), wifi_handlers_registered(false),
-    builtin_routes_registered(false), routes(), sta_connecting(false),
+    sta_netif(nullptr), ap_config{}, sta_config{}, http_server{},
+    builtin_routes_registered(false), wifi_initialized(false),
+    wifi_started(false), ap_active(false), sta_active(false),
+    wifi_handlers_registered(false), sta_connecting(false),
     sta_connected(false), sta_retry_count(0), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
     sta_last_error(ESP_OK), sta_autoconnect_attempted(false),
@@ -67,7 +46,7 @@ Gateway::Gateway()
 }
 
 Gateway::~Gateway() {
-  stop_server();
+  http_server.stop();
   if (sta_active || sta_connecting || sta_connected) {
     stop_station();
   }
@@ -77,47 +56,10 @@ Gateway::~Gateway() {
   mdns_service.stop();
 }
 
-bool Gateway::has_route(std::string_view uri, httpd_method_t method) const {
-  for (const auto &route : routes) {
-    if (route->method == method && route->uri == uri) {
-      return true;
-    }
-  }
-  return false;
-}
-
 esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
                              RequestHandler handler, void *user_ctx) {
-  if (uri.empty() || !handler) {
-    return ESP_ERR_INVALID_ARG;
-  }
-
-  if (has_route(uri, method)) {
-    return ESP_ERR_INVALID_STATE;
-  }
-
-  auto entry = std::make_unique<UriHandler>(
-      uri, method, handler, user_ctx ? user_ctx : this);
-  UriHandler &route = *entry;
-
-  if (http_server) {
-    const esp_err_t err = register_route_with_server(route);
-    if (err != ESP_OK) {
-      return err;
-    }
-  }
-
-  routes.push_back(std::move(entry));
-  return ESP_OK;
-}
-
-esp_err_t Gateway::register_route_with_server(UriHandler &route) const {
-  if (!http_server) {
-    return ESP_ERR_INVALID_STATE;
-  }
-
-  route.refresh_descriptor();
-  return httpd_register_uri_handler(http_server, &route.descriptor);
+  return http_server.add_route(uri, method, handler,
+                               user_ctx ? user_ctx : this);
 }
 
 void Gateway::ensure_builtin_routes() {
@@ -161,72 +103,34 @@ void Gateway::ensure_builtin_routes() {
 }
 
 esp_err_t Gateway::start_server() {
-  if (server_running) {
+  if (http_server.is_running()) {
     logging::info("Server already running", "gateway");
     return ESP_OK;
   }
 
   ensure_builtin_routes();
 
-  esp_err_t err = start_http_server();
+  esp_err_t err = http_server.start();
   if (err != ESP_OK) {
     return err;
   }
 
-  server_running = true;
   logging::info("HTTP server started", "gateway");
-
   return ESP_OK;
 }
 
 esp_err_t Gateway::stop_server() {
-  if (!server_running) {
+  if (!http_server.is_running()) {
     logging::info("Server already stopped", "gateway");
     return ESP_OK;
   }
 
-  if (http_server) {
-    esp_err_t err = httpd_stop(http_server);
-    if (err != ESP_OK) {
-      return err;
-    }
-    http_server = nullptr;
-  }
-
-  server_running = false;
-  logging::info("HTTP server stopped", "gateway");
-  return ESP_OK;
-}
-
-esp_err_t Gateway::start_http_server() {
-  if (http_server) {
-    httpd_stop(http_server);
-    http_server = nullptr;
-  }
-
-  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  config.max_uri_handlers = 16;
-  config.lru_purge_enable = true;
-  // Allow slower clients more time before the server aborts the socket on send/recv.
-  config.recv_wait_timeout = 20;
-  config.send_wait_timeout = 30;
-
-  esp_err_t err = httpd_start(&http_server, &config);
+  esp_err_t err = http_server.stop();
   if (err != ESP_OK) {
-    http_server = nullptr;
     return err;
   }
 
-  for (auto &route : routes) {
-    route->user_ctx = route->user_ctx ? route->user_ctx : this;
-    const esp_err_t reg_err = register_route_with_server(*route);
-    if (reg_err != ESP_OK) {
-      httpd_stop(http_server);
-      http_server = nullptr;
-      return reg_err;
-    }
-  }
-
+  logging::info("HTTP server stopped", "gateway");
   return ESP_OK;
 }
 

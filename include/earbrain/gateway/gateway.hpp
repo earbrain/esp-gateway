@@ -1,5 +1,6 @@
 #pragma once
 
+#include "earbrain/gateway/http_server.hpp"
 #include "earbrain/gateway/mdns_service.hpp"
 #include "earbrain/gateway/wifi_credentials.hpp"
 #include "earbrain/gateway/wifi_scan.hpp"
@@ -10,10 +11,8 @@
 #include "esp_netif_types.h"
 #include "esp_wifi_types.h"
 #include <cstddef>
-#include <memory>
 #include <string>
 #include <string_view>
-#include <vector>
 
 struct esp_netif_obj;
 
@@ -54,8 +53,7 @@ public:
 
   WifiCredentialStore &wifi_credentials() { return wifi_credentials_store; }
   MdnsService &mdns() { return mdns_service; }
-
-  using RequestHandler = esp_err_t (*)(httpd_req_t *);
+  HttpServer &server() { return http_server; }
 
   esp_err_t add_route(std::string_view uri, httpd_method_t method,
                       RequestHandler handler, void *user_ctx = nullptr);
@@ -63,12 +61,7 @@ public:
   static const char *version() { return "0.0.0"; }
 
 private:
-  struct UriHandler;
-
-  esp_err_t start_http_server();
   void ensure_builtin_routes();
-  esp_err_t register_route_with_server(UriHandler &route) const;
-  bool has_route(std::string_view uri, httpd_method_t method) const;
   static esp_err_t handle_wifi_status_get(httpd_req_t *req);
   static esp_err_t handle_wifi_scan_get(httpd_req_t *req);
   static void ip_event_handler(void *arg, esp_event_base_t event_base,
@@ -89,15 +82,13 @@ private:
   esp_netif_obj *sta_netif;
   AccessPointConfig ap_config;
   StationConfig sta_config;
-  httpd_handle_t http_server;
-  bool server_running;
+  HttpServer http_server;
+  bool builtin_routes_registered;
   bool wifi_initialized;
   bool wifi_started;
   bool ap_active;
   bool sta_active;
   bool wifi_handlers_registered;
-  bool builtin_routes_registered;
-  std::vector<std::unique_ptr<UriHandler>> routes;
   bool sta_connecting;
   bool sta_connected;
   int sta_retry_count;
