@@ -7,7 +7,11 @@
 
 namespace earbrain {
 
-static constexpr const char mdns_tag[] = "mdns";
+namespace {
+
+constexpr const char mdns_tag[] = "mdns";
+
+} // namespace
 
 esp_err_t MdnsService::ensure_initialized() {
   if (initialized) {

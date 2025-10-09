@@ -12,7 +12,9 @@
 
 namespace earbrain::handlers::device {
 
-static const char *chip_model_string(const esp_chip_info_t &info) {
+namespace {
+
+const char *chip_model_string(const esp_chip_info_t &info) {
   switch (info.model) {
   case CHIP_ESP32:
     return "ESP32";
@@ -34,6 +36,8 @@ static const char *chip_model_string(const esp_chip_info_t &info) {
 }
 
 constexpr const char build_timestamp[] = __DATE__ " " __TIME__;
+
+} // namespace
 
 esp_err_t handle_get(httpd_req_t *req) {
   auto *gateway = static_cast<Gateway *>(req->user_ctx);

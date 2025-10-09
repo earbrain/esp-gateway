@@ -8,14 +8,14 @@
 
 namespace earbrain {
 
-// NVS keys for WiFi credentials
-inline constexpr const char wifi_nvs_namespace[] = "wifi";
-inline constexpr const char wifi_nvs_ssid_key[] = "sta_ssid";
-inline constexpr const char wifi_nvs_pass_key[] = "sta_pass";
-
-static constexpr const char wifi_tag[] = "wifi_credentials";
-
 namespace {
+
+// NVS keys for WiFi credentials
+constexpr const char wifi_nvs_namespace[] = "wifi";
+constexpr const char wifi_nvs_ssid_key[] = "sta_ssid";
+constexpr const char wifi_nvs_pass_key[] = "sta_pass";
+
+constexpr const char wifi_tag[] = "wifi_credentials";
 
 std::optional<std::string> read_nvs_string(nvs_handle_t handle, const char* key, esp_err_t& err) {
   size_t len = 0;

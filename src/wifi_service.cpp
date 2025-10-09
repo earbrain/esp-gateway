@@ -20,13 +20,15 @@
 
 namespace earbrain {
 
-static constexpr const char wifi_tag[] = "wifi";
+namespace {
 
-static constexpr uint8_t sta_listen_interval = 1;
-static constexpr int8_t sta_tx_power_qdbm = 78;
-static constexpr int sta_max_connect_retries = 5;
+constexpr const char wifi_tag[] = "wifi";
 
-static int signal_quality_from_rssi(int32_t rssi) {
+constexpr uint8_t sta_listen_interval = 1;
+constexpr int8_t sta_tx_power_qdbm = 78;
+constexpr int sta_max_connect_retries = 5;
+
+int signal_quality_from_rssi(int32_t rssi) {
   if (rssi <= -100) {
     return 0;
   }
@@ -37,14 +39,14 @@ static int signal_quality_from_rssi(int32_t rssi) {
   return std::clamp(quality, 0, 100);
 }
 
-static std::string format_bssid(const uint8_t (&bssid)[6]) {
+std::string format_bssid(const uint8_t (&bssid)[6]) {
   char buffer[18] = {0};
   std::snprintf(buffer, sizeof(buffer), "%02X:%02X:%02X:%02X:%02X:%02X",
                 bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
   return std::string(buffer);
 }
 
-static wifi_config_t make_ap_config(const AccessPointConfig &config) {
+wifi_config_t make_ap_config(const AccessPointConfig &config) {
   wifi_config_t cfg{};
   std::fill(std::begin(cfg.ap.ssid), std::end(cfg.ap.ssid), '\0');
   std::copy_n(config.ssid.data(), config.ssid.size(), cfg.ap.ssid);
@@ -57,7 +59,7 @@ static wifi_config_t make_ap_config(const AccessPointConfig &config) {
   return cfg;
 }
 
-static wifi_config_t make_sta_config(const StationConfig &config) {
+wifi_config_t make_sta_config(const StationConfig &config) {
   wifi_config_t cfg{};
   std::fill(std::begin(cfg.sta.ssid), std::end(cfg.sta.ssid), '\0');
   std::copy_n(config.ssid.data(), config.ssid.size(), cfg.sta.ssid);
@@ -78,7 +80,7 @@ static wifi_config_t make_sta_config(const StationConfig &config) {
   return cfg;
 }
 
-static bool should_retry_reason(wifi_err_reason_t reason) {
+bool should_retry_reason(wifi_err_reason_t reason) {
   switch (reason) {
   case WIFI_REASON_AUTH_LEAVE:
   case WIFI_REASON_ASSOC_LEAVE:
@@ -88,6 +90,8 @@ static bool should_retry_reason(wifi_err_reason_t reason) {
     return true;
   }
 }
+
+} // namespace
 
 WifiService::WifiService()
   : softap_netif(nullptr), sta_netif(nullptr), ap_config{}, sta_config{},

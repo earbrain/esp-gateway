@@ -6,18 +6,20 @@
 
 namespace earbrain::handlers::portal {
 
-static constexpr auto html_content_type = "text/html; charset=utf-8";
-static constexpr auto js_content_type = "application/javascript";
-static constexpr auto css_content_type = "text/css";
-static constexpr size_t chunk_size = 1024;
+namespace {
 
-static constexpr const uint8_t *truncate_null_terminator(const uint8_t *begin,
-                                                         const uint8_t *end) {
+constexpr auto html_content_type = "text/html; charset=utf-8";
+constexpr auto js_content_type = "application/javascript";
+constexpr auto css_content_type = "text/css";
+constexpr size_t chunk_size = 1024;
+
+constexpr const uint8_t *truncate_null_terminator(const uint8_t *begin,
+                                                   const uint8_t *end) {
   return (begin != end && *(end - 1) == '\0') ? end - 1 : end;
 }
 
-static esp_err_t send_embedded(httpd_req_t *req, const uint8_t *begin,
-                               const uint8_t *end) {
+esp_err_t send_embedded(httpd_req_t *req, const uint8_t *begin,
+                        const uint8_t *end) {
   end = truncate_null_terminator(begin, end);
   size_t remaining = static_cast<size_t>(end - begin);
   const uint8_t *cursor = begin;
@@ -35,6 +37,8 @@ static esp_err_t send_embedded(httpd_req_t *req, const uint8_t *begin,
 
   return httpd_resp_send_chunk(req, nullptr, 0);
 }
+
+} // namespace
 
 extern "C" {
 extern const uint8_t _binary_index_html_start[];
