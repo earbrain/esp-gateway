@@ -26,6 +26,7 @@ idf_component_register(
         "src/handlers/wifi_handler.cpp"
         "src/logging.cpp"
         "src/wifi.cpp"
+        "src/wifi_credentials.cpp"
     INCLUDE_DIRS
         "include"
     PRIV_INCLUDE_DIRS

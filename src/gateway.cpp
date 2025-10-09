@@ -61,8 +61,8 @@ Gateway::Gateway()
     builtin_routes_registered(false), routes(), sta_connecting(false),
     sta_connected(false), sta_retry_count(0), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
-    sta_last_error(ESP_OK), saved_sta_config{}, has_saved_sta_credentials(false),
-    sta_credentials_loaded(false), sta_autoconnect_attempted(false),
+    sta_last_error(ESP_OK), sta_autoconnect_attempted(false),
+    wifi_credentials_store{},
     mdns_config{}, mdns_initialized(false), mdns_service_registered(false),
     mdns_running(false), mdns_registered_service_type{},
     mdns_registered_protocol{} {
@@ -283,31 +283,9 @@ esp_err_t Gateway::handle_wifi_scan_get(httpd_req_t *req) {
 
 esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
                                          std::string_view passphrase) {
-  nvs_handle_t handle = 0;
-  esp_err_t err = nvs_open(wifi_nvs_namespace, NVS_READWRITE, &handle);
-  if (err != ESP_OK) {
-    return err;
-  }
-
-  std::string ssid_copy(ssid);
-  err = nvs_set_str(handle, wifi_nvs_ssid_key, ssid_copy.c_str());
-
+  esp_err_t err = wifi_credentials_store.save(ssid, passphrase);
   if (err == ESP_OK) {
-    std::string pass_copy(passphrase);
-    err = nvs_set_str(handle, wifi_nvs_pass_key, pass_copy.c_str());
-  }
-
-  if (err == ESP_OK) {
-    err = nvs_commit(handle);
-  }
-
-  nvs_close(handle);
-  if (err == ESP_OK) {
-    saved_sta_config.ssid.assign(ssid.data(), ssid.size());
-    saved_sta_config.passphrase.assign(passphrase.data(), passphrase.size());
-    has_saved_sta_credentials = !saved_sta_config.ssid.empty();
-    sta_credentials_loaded = true;
-    set_sta_autoconnect_attempted(false);
+    sta_autoconnect_attempted = false;
   }
   return err;
 }

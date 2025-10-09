@@ -1,5 +1,6 @@
 #pragma once
 
+#include "earbrain/gateway/wifi_credentials.hpp"
 #include "earbrain/gateway/wifi_scan.hpp"
 
 #include "esp_err.h"
@@ -26,11 +27,6 @@ struct AccessPointConfig {
   uint8_t channel = 1;
   wifi_auth_mode_t auth_mode = WIFI_AUTH_OPEN;
   uint8_t max_connections = 4;
-};
-
-struct StationConfig {
-  std::string ssid;
-  std::string passphrase;
 };
 
 struct MdnsConfig {
@@ -63,6 +59,8 @@ public:
   esp_err_t save_wifi_credentials(std::string_view ssid, std::string_view passphrase);
   void set_sta_autoconnect_attempted(bool value);
 
+  WifiCredentialStore &wifi_credentials() { return wifi_credentials_store; }
+
   const MdnsConfig &mdns_configuration() const noexcept { return mdns_config; }
   bool mdns_is_running() const noexcept { return mdns_running; }
 
@@ -88,7 +86,6 @@ private:
                                  int32_t event_id, void *event_data);
   void on_sta_got_ip(const ip_event_got_ip_t &event);
   void on_sta_disconnected(const wifi_event_sta_disconnected_t &event);
-  esp_err_t load_wifi_credentials();
   void start_station_with_saved_profile();
   esp_err_t ensure_wifi_initialized();
   esp_err_t register_wifi_event_handlers();
@@ -117,10 +114,8 @@ private:
   esp_ip4_addr_t sta_ip;
   wifi_err_reason_t sta_last_disconnect_reason;
   esp_err_t sta_last_error;
-  StationConfig saved_sta_config;
-  bool has_saved_sta_credentials;
-  bool sta_credentials_loaded;
   bool sta_autoconnect_attempted;
+  WifiCredentialStore wifi_credentials_store;
   MdnsConfig mdns_config;
   bool mdns_initialized;
   bool mdns_service_registered;
