@@ -17,7 +17,10 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { path: "/", label: "Home" },
-  { path: "/device", label: "Device" },
+  { path: "/device/info", label: "Device Info" },
+  { path: "/device/metrics", label: "Metrics" },
+  { path: "/device/logs", label: "Logs" },
+  { path: "/device/mdns", label: "mDNS" },
   { path: "/wifi", label: "Wi-Fi" },
 ];
 
