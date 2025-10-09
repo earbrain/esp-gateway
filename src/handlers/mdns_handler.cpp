@@ -19,7 +19,7 @@ esp_err_t handle_get(httpd_req_t *req) {
     return ESP_ERR_NO_MEM;
   }
 
-  const MdnsConfig &config = gateway->mdns_configuration();
+  const MdnsConfig &config = gateway->mdns().config();
 
   if (json::add(data.get(), "hostname", config.hostname) != ESP_OK) {
     return ESP_ERR_NO_MEM;
@@ -37,7 +37,7 @@ esp_err_t handle_get(httpd_req_t *req) {
                                static_cast<int>(config.port))) {
     return ESP_ERR_NO_MEM;
   }
-  if (json::add(data.get(), "running", gateway->mdns_is_running()) != ESP_OK) {
+  if (json::add(data.get(), "running", gateway->mdns().is_running()) != ESP_OK) {
     return ESP_ERR_NO_MEM;
   }
 

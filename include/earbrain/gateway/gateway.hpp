@@ -1,5 +1,6 @@
 #pragma once
 
+#include "earbrain/gateway/mdns_service.hpp"
 #include "earbrain/gateway/wifi_credentials.hpp"
 #include "earbrain/gateway/wifi_scan.hpp"
 
@@ -29,14 +30,6 @@ struct AccessPointConfig {
   uint8_t max_connections = 4;
 };
 
-struct MdnsConfig {
-  std::string hostname = "esp-gateway";
-  std::string instance_name = "ESP Gateway";
-  std::string service_type = "_http";
-  std::string protocol = "_tcp";
-  uint16_t port = 80;
-};
-
 class Gateway {
 public:
   Gateway();
@@ -60,9 +53,7 @@ public:
   void set_sta_autoconnect_attempted(bool value);
 
   WifiCredentialStore &wifi_credentials() { return wifi_credentials_store; }
-
-  const MdnsConfig &mdns_configuration() const noexcept { return mdns_config; }
-  bool mdns_is_running() const noexcept { return mdns_running; }
+  MdnsService &mdns() { return mdns_service; }
 
   using RequestHandler = esp_err_t (*)(httpd_req_t *);
 
@@ -90,7 +81,6 @@ private:
   esp_err_t ensure_wifi_initialized();
   esp_err_t register_wifi_event_handlers();
   esp_err_t apply_wifi_mode();
-  esp_err_t ensure_mdns_initialized();
   WifiScanResult perform_wifi_scan();
 
   char softap_ssid[33];
@@ -116,12 +106,7 @@ private:
   esp_err_t sta_last_error;
   bool sta_autoconnect_attempted;
   WifiCredentialStore wifi_credentials_store;
-  MdnsConfig mdns_config;
-  bool mdns_initialized;
-  bool mdns_service_registered;
-  bool mdns_running;
-  std::string mdns_registered_service_type;
-  std::string mdns_registered_protocol;
+  MdnsService mdns_service;
 };
 
 } // namespace earbrain

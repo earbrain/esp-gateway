@@ -25,6 +25,7 @@ idf_component_register(
         "src/handlers/portal_handler.cpp"
         "src/handlers/wifi_handler.cpp"
         "src/logging.cpp"
+        "src/mdns_service.cpp"
         "src/wifi.cpp"
         "src/wifi_credentials.cpp"
     INCLUDE_DIRS

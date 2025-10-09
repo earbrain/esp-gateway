@@ -62,10 +62,7 @@ Gateway::Gateway()
     sta_connected(false), sta_retry_count(0), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
     sta_last_error(ESP_OK), sta_autoconnect_attempted(false),
-    wifi_credentials_store{},
-    mdns_config{}, mdns_initialized(false), mdns_service_registered(false),
-    mdns_running(false), mdns_registered_service_type{},
-    mdns_registered_protocol{} {
+    wifi_credentials_store{}, mdns_service{} {
   set_softap_ssid("gateway-ap"sv);
 }
 
@@ -77,7 +74,7 @@ Gateway::~Gateway() {
   if (ap_active) {
     stop_access_point();
   }
-  stop_mdns();
+  mdns_service.stop();
 }
 
 bool Gateway::has_route(std::string_view uri, httpd_method_t method) const {
@@ -294,115 +291,16 @@ void Gateway::set_sta_autoconnect_attempted(bool value) {
   sta_autoconnect_attempted = value;
 }
 
-esp_err_t Gateway::ensure_mdns_initialized() {
-  if (mdns_initialized) {
-    return ESP_OK;
-  }
+esp_err_t Gateway::start_mdns() {
+  return mdns_service.start(mdns_service.config());
+}
 
-  esp_err_t err = esp_netif_init();
-  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-    return err;
-  }
-
-  err = esp_event_loop_create_default();
-  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-    return err;
-  }
-
-  err = mdns_init();
-  if (err == ESP_ERR_INVALID_STATE) {
-    mdns_initialized = true;
-    return ESP_OK;
-  }
-  if (err != ESP_OK) {
-    return err;
-  }
-
-  mdns_initialized = true;
-  return ESP_OK;
+esp_err_t Gateway::start_mdns(const MdnsConfig &config) {
+  return mdns_service.start(config);
 }
 
 esp_err_t Gateway::stop_mdns() {
-  if (!mdns_initialized) {
-    mdns_running = false;
-    return ESP_OK;
-  }
-
-  esp_err_t first_error = ESP_OK;
-
-  if (mdns_service_registered && !mdns_registered_service_type.empty() &&
-      !mdns_registered_protocol.empty()) {
-    const esp_err_t err = mdns_service_remove(
-        mdns_registered_service_type.c_str(),
-        mdns_registered_protocol.c_str());
-    if (err != ESP_OK && first_error == ESP_OK) {
-      first_error = err;
-    }
-  }
-
-  mdns_service_registered = false;
-  mdns_registered_service_type.clear();
-  mdns_registered_protocol.clear();
-
-  mdns_free();
-  mdns_initialized = false;
-  mdns_running = false;
-
-  return first_error;
-}
-
-esp_err_t Gateway::start_mdns() { return start_mdns(mdns_config); }
-
-esp_err_t Gateway::start_mdns(const MdnsConfig &config) {
-  if (mdns_running) {
-    const esp_err_t stop_err = stop_mdns();
-    if (stop_err != ESP_OK) {
-      return stop_err;
-    }
-  }
-
-  MdnsConfig applied = config;
-
-  esp_err_t err = ensure_mdns_initialized();
-  if (err != ESP_OK) {
-    return err;
-  }
-
-  err = mdns_hostname_set(applied.hostname.c_str());
-  if (err != ESP_OK) {
-    stop_mdns();
-    return err;
-  }
-
-  err = mdns_instance_name_set(applied.instance_name.c_str());
-  if (err != ESP_OK) {
-    stop_mdns();
-    return err;
-  }
-
-  err = mdns_service_add(nullptr, applied.service_type.c_str(),
-                         applied.protocol.c_str(), applied.port, nullptr,
-                         0);
-  if (err != ESP_OK) {
-    stop_mdns();
-    return err;
-  }
-
-  mdns_config = std::move(applied);
-  mdns_service_registered = true;
-  mdns_registered_service_type = mdns_config.service_type;
-  mdns_registered_protocol = mdns_config.protocol;
-  mdns_running = true;
-
-  logging::infof("gateway",
-                 "mDNS started: host=%s instance=%s service=%s protocol=%s port=%u",
-                 mdns_config.hostname.c_str(),
-                 mdns_config.instance_name.c_str(),
-                 mdns_config.service_type.c_str(),
-                 mdns_config.protocol.c_str(),
-                 static_cast<unsigned>(mdns_config.port));
-
-  return ESP_OK;
+  return mdns_service.stop();
 }
 
 void Gateway::set_softap_ssid(std::string_view ssid) {
