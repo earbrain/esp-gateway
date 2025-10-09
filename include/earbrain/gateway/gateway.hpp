@@ -18,10 +18,6 @@ struct esp_netif_obj;
 
 namespace earbrain {
 
-inline constexpr const char wifi_nvs_namespace[] = "wifi";
-inline constexpr const char wifi_nvs_ssid_key[] = "sta_ssid";
-inline constexpr const char wifi_nvs_pass_key[] = "sta_pass";
-
 struct AccessPointConfig {
   std::string ssid = "gateway-ap";
   uint8_t channel = 1;
