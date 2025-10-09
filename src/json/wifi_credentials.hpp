@@ -1,23 +1,15 @@
 #pragma once
 
 #include "json/json_helpers.hpp"
+#include "earbrain/gateway/wifi_credentials.hpp"
 
 #include <string>
 #include <utility>
 
-namespace earbrain {
-
-struct WifiCredentials {
-  std::string ssid;
-  std::string passphrase;
-};
-
-} // namespace earbrain
-
 namespace earbrain::json_model {
 
-inline bool parse_wifi_credentials(cJSON *root, WifiCredentials &out,
-                                   const char **bad_field) {
+inline bool parse_station_config(cJSON *root, StationConfig &out,
+                                 const char **bad_field) {
   if (!root) {
     if (bad_field) {
       *bad_field = nullptr;

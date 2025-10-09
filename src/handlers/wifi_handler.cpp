@@ -55,9 +55,9 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
     return http::send_fail(req, "Invalid JSON body.");
   }
 
-  WifiCredentials credentials{};
+  StationConfig station_cfg{};
   const char *bad_field = nullptr;
-  if (!json_model::parse_wifi_credentials(root.get(), credentials, &bad_field)) {
+  if (!json_model::parse_station_config(root.get(), station_cfg, &bad_field)) {
     std::string message = bad_field
                             ? std::string(bad_field) + " must be a string."
                             : "Invalid credentials payload.";
@@ -65,22 +65,22 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
                                  message.c_str());
   }
 
-  if (!validation::is_valid_ssid(credentials.ssid)) {
+  if (!validation::is_valid_ssid(station_cfg.ssid)) {
     return http::send_fail_field(req, "ssid",
                                  "ssid must be 1-32 characters.");
   }
 
-  if (!validation::is_valid_passphrase(credentials.passphrase)) {
+  if (!validation::is_valid_passphrase(station_cfg.passphrase)) {
     return http::send_fail_field(req, "passphrase",
                                  "Passphrase must be 8-63 chars or 64 hex.");
   }
 
   logging::infof("gateway",
                  "Received Wi-Fi credentials update for SSID='%s' (len=%zu)",
-                 credentials.ssid.c_str(), credentials.ssid.size());
+                 station_cfg.ssid.c_str(), station_cfg.ssid.size());
 
   const esp_err_t result =
-      gateway->save_wifi_credentials(credentials.ssid, credentials.passphrase);
+      gateway->save_wifi_credentials(station_cfg.ssid, station_cfg.passphrase);
   if (result != ESP_OK) {
     logging::errorf("gateway", "Failed to save Wi-Fi credentials: %s",
                     esp_err_to_name(result));
@@ -96,10 +96,6 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
     logging::warnf("gateway", "Failed to stop existing station: %s",
                    esp_err_to_name(stop_err));
   }
-
-  StationConfig station_cfg{};
-  station_cfg.ssid = credentials.ssid;
-  station_cfg.passphrase = credentials.passphrase;
 
   const esp_err_t sta_err = gateway->start_station(station_cfg);
   const bool sta_started = (sta_err == ESP_OK);
