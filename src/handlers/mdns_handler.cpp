@@ -3,15 +3,16 @@
 #include <utility>
 
 #include "earbrain/gateway/gateway.hpp"
+#include "earbrain/gateway/handlers/handler_helpers.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 
 namespace earbrain::handlers::mdns {
 
 esp_err_t handle_get(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  auto *gateway = handlers::get_gateway(req);
   if (!gateway) {
-    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+    return ESP_FAIL;
   }
 
   auto data = json::object();

@@ -4,6 +4,7 @@
 
 #include "earbrain/gateway/device_detail.hpp"
 #include "earbrain/gateway/gateway.hpp"
+#include "earbrain/gateway/handlers/handler_helpers.hpp"
 #include "json/device_detail.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
@@ -40,14 +41,17 @@ constexpr const char build_timestamp[] = __DATE__ " " __TIME__;
 } // namespace
 
 esp_err_t handle_get(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  auto *gateway = handlers::get_gateway(req);
+  if (!gateway) {
+    return ESP_FAIL;
+  }
 
   esp_chip_info_t chip_info{};
   esp_chip_info(&chip_info);
 
   DeviceDetail detail;
   detail.model = chip_model_string(chip_info);
-  detail.firmware_version = gateway ? gateway->version() : "unknown";
+  detail.firmware_version = gateway->version();
   detail.build_time = build_timestamp;
   detail.idf_version = esp_get_idf_version();
 

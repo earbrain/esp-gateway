@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "earbrain/gateway/gateway.hpp"
+#include "earbrain/gateway/handlers/handler_helpers.hpp"
 #include "earbrain/gateway/logging.hpp"
 #include "earbrain/gateway/validation.hpp"
 #include "json/http_response.hpp"
@@ -24,9 +25,9 @@ constexpr std::size_t max_request_body_size = 1024;
 } // namespace
 
 esp_err_t handle_credentials_post(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  auto *gateway = handlers::get_gateway(req);
   if (!gateway) {
-    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+    return ESP_FAIL;
   }
 
   if (req->content_len <= 0 ||
@@ -127,9 +128,9 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
 }
 
 esp_err_t handle_status_get(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  auto *gateway = handlers::get_gateway(req);
   if (!gateway) {
-    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+    return ESP_FAIL;
   }
 
   WifiStatus wifi_status = gateway->wifi().status();
@@ -157,9 +158,9 @@ esp_err_t handle_status_get(httpd_req_t *req) {
 }
 
 esp_err_t handle_scan_get(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  auto *gateway = handlers::get_gateway(req);
   if (!gateway) {
-    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+    return ESP_FAIL;
   }
 
   WifiScanResult result = gateway->wifi().perform_scan();

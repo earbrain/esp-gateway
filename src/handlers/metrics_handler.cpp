@@ -35,4 +35,3 @@ esp_err_t handle_get(httpd_req_t *req) {
 }
 
 } // namespace earbrain::handlers::metrics
-
