@@ -19,6 +19,7 @@ idf_component_register(
     SRCS
         "src/gateway.cpp"
         "src/handlers/device_handler.cpp"
+        "src/handlers/health_handler.cpp"
         "src/handlers/log_handler.cpp"
         "src/handlers/metrics_handler.cpp"
         "src/handlers/mdns_handler.cpp"

@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "earbrain/gateway/handlers/device_handler.hpp"
+#include "earbrain/gateway/handlers/health_handler.hpp"
 #include "earbrain/gateway/handlers/log_handler.hpp"
 #include "earbrain/gateway/handlers/metrics_handler.hpp"
 #include "earbrain/gateway/handlers/mdns_handler.hpp"
@@ -50,6 +51,7 @@ void Gateway::ensure_builtin_routes() {
       {"/device", HTTP_GET, &handlers::portal::handle_root_get},
       {"/app.js", HTTP_GET, &handlers::portal::handle_app_js_get},
       {"/assets/index.css", HTTP_GET, &handlers::portal::handle_assets_css_get},
+      {"/health", HTTP_GET, &handlers::health::handle_health},
       {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
       {"/api/v1/metrics", HTTP_GET, &handlers::metrics::handle_get},
       {"/api/v1/wifi/credentials", HTTP_POST, &handlers::wifi::handle_credentials_post},
