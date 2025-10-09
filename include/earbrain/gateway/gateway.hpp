@@ -60,6 +60,9 @@ public:
 
   void set_softap_ssid(std::string_view ssid);
 
+  esp_err_t save_wifi_credentials(std::string_view ssid, std::string_view passphrase);
+  void set_sta_autoconnect_attempted(bool value);
+
   const MdnsConfig &mdns_configuration() const noexcept { return mdns_config; }
   bool mdns_is_running() const noexcept { return mdns_running; }
 
@@ -77,7 +80,6 @@ private:
   void ensure_builtin_routes();
   esp_err_t register_route_with_server(UriHandler &route) const;
   bool has_route(std::string_view uri, httpd_method_t method) const;
-  static esp_err_t handle_wifi_credentials_post(httpd_req_t *req);
   static esp_err_t handle_wifi_status_get(httpd_req_t *req);
   static esp_err_t handle_wifi_scan_get(httpd_req_t *req);
   static void ip_event_handler(void *arg, esp_event_base_t event_base,
@@ -86,8 +88,6 @@ private:
                                  int32_t event_id, void *event_data);
   void on_sta_got_ip(const ip_event_got_ip_t &event);
   void on_sta_disconnected(const wifi_event_sta_disconnected_t &event);
-  esp_err_t save_wifi_credentials(std::string_view ssid,
-                                  std::string_view passphrase);
   esp_err_t load_wifi_credentials();
   void start_station_with_saved_profile();
   esp_err_t ensure_wifi_initialized();

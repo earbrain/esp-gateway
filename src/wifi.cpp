@@ -374,7 +374,7 @@ esp_err_t Gateway::start_station() {
                  "Attempting auto-connect to saved SSID: '%s' (len=%zu)",
                  saved_sta_config.ssid.c_str(), saved_sta_config.ssid.size());
 
-  sta_autoconnect_attempted = true;
+  set_sta_autoconnect_attempted(true);
 
   StationConfig cfg = saved_sta_config;
   return start_station(cfg);

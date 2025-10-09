@@ -11,14 +11,13 @@
 #include <vector>
 
 #include "earbrain/gateway/handlers/device_handler.hpp"
+#include "earbrain/gateway/handlers/log_handler.hpp"
 #include "earbrain/gateway/handlers/metrics_handler.hpp"
 #include "earbrain/gateway/handlers/mdns_handler.hpp"
-#include "earbrain/gateway/handlers/log_handler.hpp"
 #include "earbrain/gateway/handlers/portal_handler.hpp"
+#include "earbrain/gateway/handlers/wifi_handler.hpp"
 #include "earbrain/gateway/logging.hpp"
 #include "json/http_response.hpp"
-#include "json/json_helpers.hpp"
-#include "json/wifi_credentials.hpp"
 #include "json/wifi_status.hpp"
 #include "json/wifi_scan.hpp"
 #include "esp_event.h"
@@ -32,23 +31,6 @@
 namespace earbrain {
 
 using namespace std::string_view_literals;
-
-static constexpr size_t max_request_body_size = 1024;
-
-static bool is_valid_passphrase(std::string_view passphrase) {
-  const std::size_t len = passphrase.size();
-  if (len >= 8 && len <= 63) {
-    return true;
-  }
-
-  if (len == 64) {
-    return std::all_of(passphrase.begin(), passphrase.end(), [](char ch) {
-      return std::isxdigit(static_cast<unsigned char>(ch));
-    });
-  }
-
-  return false;
-}
 
 struct Gateway::UriHandler {
   UriHandler(std::string_view path, httpd_method_t m, RequestHandler h,
@@ -162,7 +144,7 @@ void Gateway::ensure_builtin_routes() {
       {"/assets/index.css", HTTP_GET, &handlers::portal::handle_assets_css_get},
       {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
       {"/api/v1/metrics", HTTP_GET, &handlers::metrics::handle_get},
-      {"/api/v1/wifi/credentials", HTTP_POST, &Gateway::handle_wifi_credentials_post},
+      {"/api/v1/wifi/credentials", HTTP_POST, &handlers::wifi::handle_credentials_post},
       {"/api/v1/wifi/status", HTTP_GET, &Gateway::handle_wifi_status_get},
       {"/api/v1/wifi/scan", HTTP_GET, &Gateway::handle_wifi_scan_get},
       {"/api/v1/mdns", HTTP_GET, &handlers::mdns::handle_get},
@@ -251,112 +233,6 @@ esp_err_t Gateway::start_http_server() {
   return ESP_OK;
 }
 
-esp_err_t Gateway::handle_wifi_credentials_post(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
-  if (!gateway) {
-    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
-  }
-
-  if (req->content_len <= 0 ||
-      static_cast<size_t>(req->content_len) > max_request_body_size) {
-    return http::send_fail(req, "Invalid request size.");
-  }
-
-  std::string body;
-  body.resize(static_cast<size_t>(req->content_len));
-  size_t received = 0;
-
-  while (received < body.size()) {
-    const int ret =
-        httpd_req_recv(req, body.data() + received, body.size() - received);
-    if (ret <= 0) {
-      if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-        continue;
-      }
-      return http::send_fail(req, "Failed to read request body.");
-    }
-    received += static_cast<size_t>(ret);
-  }
-
-  auto root = json::parse(body);
-  if (!root || !cJSON_IsObject(root.get())) {
-    return http::send_fail(req, "Invalid JSON body.");
-  }
-  WifiCredentials credentials{};
-  const char *bad_field = nullptr;
-  if (!json_model::parse_wifi_credentials(root.get(), credentials, &bad_field)) {
-    std::string message = bad_field
-                            ? std::string(bad_field) + " must be a string."
-                            : "Invalid credentials payload.";
-    return http::send_fail_field(req, bad_field ? bad_field : "body", message.c_str());
-  }
-
-  if (credentials.ssid.empty() || credentials.ssid.size() > 32) {
-    return http::send_fail_field(req, "ssid", "ssid must be 1-32 characters.");
-  }
-
-  if (!is_valid_passphrase(credentials.passphrase)) {
-    return http::send_fail_field(req, "passphrase", "Passphrase must be 8-63 chars or 64 hex.");
-  }
-
-  logging::infof("gateway",
-                 "Received Wi-Fi credentials update for SSID='%s' (len=%zu)",
-                 credentials.ssid.c_str(), credentials.ssid.size());
-
-  const esp_err_t result = gateway->save_wifi_credentials(credentials.ssid, credentials.passphrase);
-
-  if (result != ESP_OK) {
-    logging::errorf("gateway", "Failed to save Wi-Fi credentials: %s",
-                    esp_err_to_name(result));
-    return http::send_error(req, "Failed to save credentials.", esp_err_to_name(result));
-  }
-
-  logging::info("Wi-Fi credentials saved. Preparing to start station",
-                "gateway");
-
-  esp_err_t sta_err = ESP_OK;
-  bool sta_started = false;
-
-  const esp_err_t stop_err = gateway->stop_station();
-  if (stop_err != ESP_OK) {
-    logging::warnf("gateway", "Failed to stop existing station: %s",
-                   esp_err_to_name(stop_err));
-  }
-
-  StationConfig station_cfg{};
-  station_cfg.ssid = credentials.ssid;
-  station_cfg.passphrase = credentials.passphrase;
-
-  sta_err = gateway->start_station(station_cfg);
-  if (sta_err == ESP_OK) {
-    sta_started = true;
-    logging::infof("gateway", "Station connection initiated for SSID: %s",
-                   station_cfg.ssid.c_str());
-  } else {
-    logging::errorf("gateway", "Failed to start station: %s",
-                    esp_err_to_name(sta_err));
-  }
-  gateway->sta_autoconnect_attempted = true;
-
-  auto data = json::object();
-  if (!data) {
-    return ESP_ERR_NO_MEM;
-  }
-  if (json::add(data.get(), "restart_required", !sta_started) != ESP_OK) {
-    return ESP_ERR_NO_MEM;
-  }
-  if (json::add(data.get(), "sta_connect_started", sta_started) != ESP_OK) {
-    return ESP_ERR_NO_MEM;
-  }
-  if (!sta_started) {
-    if (json::add(data.get(), "sta_error", esp_err_to_name(sta_err)) != ESP_OK) {
-      return ESP_ERR_NO_MEM;
-    }
-  }
-
-  return http::send_success(req, std::move(data));
-}
-
 esp_err_t Gateway::handle_wifi_status_get(httpd_req_t *req) {
   auto *gateway = static_cast<Gateway *>(req->user_ctx);
   if (!gateway) {
@@ -431,9 +307,13 @@ esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
     saved_sta_config.passphrase.assign(passphrase.data(), passphrase.size());
     has_saved_sta_credentials = !saved_sta_config.ssid.empty();
     sta_credentials_loaded = true;
-    sta_autoconnect_attempted = false;
+    set_sta_autoconnect_attempted(false);
   }
   return err;
+}
+
+void Gateway::set_sta_autoconnect_attempted(bool value) {
+  sta_autoconnect_attempted = value;
 }
 
 esp_err_t Gateway::ensure_mdns_initialized() {
