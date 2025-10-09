@@ -1,14 +1,7 @@
 #include "earbrain/gateway/gateway.hpp"
 
-#include <algorithm>
-#include <cctype>
-#include <cstdint>
 #include <cstring>
-#include <memory>
-#include <string>
 #include <string_view>
-#include <utility>
-#include <vector>
 
 #include "earbrain/gateway/handlers/device_handler.hpp"
 #include "earbrain/gateway/handlers/log_handler.hpp"
@@ -17,15 +10,6 @@
 #include "earbrain/gateway/handlers/portal_handler.hpp"
 #include "earbrain/gateway/handlers/wifi_handler.hpp"
 #include "earbrain/gateway/logging.hpp"
-#include "json/http_response.hpp"
-#include "json/wifi_status.hpp"
-#include "json/wifi_scan.hpp"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "esp_netif.h"
-#include "esp_wifi.h"
-#include "mdns.h"
-#include "nvs.h"
 #include "lwip/ip4_addr.h"
 
 namespace earbrain {
