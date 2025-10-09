@@ -33,26 +33,11 @@ namespace earbrain {
 using namespace std::string_view_literals;
 
 Gateway::Gateway()
-  : softap_ssid{}, softap_ssid_len(0), softap_netif(nullptr),
-    sta_netif(nullptr), ap_config{}, sta_config{}, http_server{},
-    builtin_routes_registered(false), wifi_initialized(false),
-    wifi_started(false), ap_active(false), sta_active(false),
-    wifi_handlers_registered(false), sta_connecting(false),
-    sta_connected(false), sta_retry_count(0), sta_ip{},
-    sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
-    sta_last_error(ESP_OK), sta_autoconnect_attempted(false),
-    wifi_credentials_store{}, mdns_service{} {
-  set_softap_ssid("gateway-ap"sv);
-}
+  : wifi_service{}, http_server{}, mdns_service{},
+    builtin_routes_registered(false) {}
 
 Gateway::~Gateway() {
   http_server.stop();
-  if (sta_active || sta_connecting || sta_connected) {
-    stop_station();
-  }
-  if (ap_active) {
-    stop_access_point();
-  }
   mdns_service.stop();
 }
 
@@ -134,23 +119,58 @@ esp_err_t Gateway::stop_server() {
   return ESP_OK;
 }
 
+esp_err_t Gateway::start_access_point() {
+  return wifi_service.start_access_point();
+}
+
+esp_err_t Gateway::start_access_point(const AccessPointConfig &config) {
+  return wifi_service.start_access_point(config);
+}
+
+esp_err_t Gateway::stop_access_point() {
+  return wifi_service.stop_access_point();
+}
+
+esp_err_t Gateway::start_station() {
+  return wifi_service.start_station();
+}
+
+esp_err_t Gateway::start_station(const StationConfig &config) {
+  return wifi_service.start_station(config);
+}
+
+esp_err_t Gateway::stop_station() {
+  return wifi_service.stop_station();
+}
+
+esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
+                                         std::string_view passphrase) {
+  esp_err_t err = wifi_service.credentials().save(ssid, passphrase);
+  if (err == ESP_OK) {
+    wifi_service.set_autoconnect_attempted(false);
+  }
+  return err;
+}
+
 esp_err_t Gateway::handle_wifi_status_get(httpd_req_t *req) {
   auto *gateway = static_cast<Gateway *>(req->user_ctx);
   if (!gateway) {
     return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
   }
 
-  WifiStatus status;
-  status.ap_active = gateway->ap_active;
-  status.sta_active = gateway->sta_active;
-  status.sta_connecting = gateway->sta_connecting;
-  status.sta_connected = gateway->sta_connected;
-  status.last_error = gateway->sta_last_error;
-  status.disconnect_reason = gateway->sta_last_disconnect_reason;
+  WifiStatus wifi_status = gateway->wifi_service.status();
 
-  const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&gateway->sta_ip);
+  json_model::WifiStatus status;
+  status.ap_active = wifi_status.ap_active;
+  status.sta_active = wifi_status.sta_active;
+  status.sta_connecting = wifi_status.sta_connecting;
+  status.sta_connected = wifi_status.sta_connected;
+  status.last_error = wifi_status.sta_last_error;
+  status.disconnect_reason = wifi_status.sta_last_disconnect_reason;
+
+  const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&wifi_status.sta_ip);
   char ip_buffer[16] = {0};
-  if (gateway->sta_connected && ip4addr_ntoa_r(ip4, ip_buffer, sizeof(ip_buffer))) {
+  if (wifi_status.sta_connected && ip4addr_ntoa_r(ip4, ip_buffer, sizeof(ip_buffer))) {
     status.ip = ip_buffer;
   }
 
@@ -168,7 +188,7 @@ esp_err_t Gateway::handle_wifi_scan_get(httpd_req_t *req) {
     return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
   }
 
-  WifiScanResult result = gateway->perform_wifi_scan();
+  WifiScanResult result = gateway->wifi_service.perform_scan();
 
   if (result.error != ESP_OK) {
     return http::send_error(req, "Wi-Fi scan failed", esp_err_to_name(result.error));
@@ -182,19 +202,6 @@ esp_err_t Gateway::handle_wifi_scan_get(httpd_req_t *req) {
   return http::send_success(req, std::move(payload));
 }
 
-esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
-                                         std::string_view passphrase) {
-  esp_err_t err = wifi_credentials_store.save(ssid, passphrase);
-  if (err == ESP_OK) {
-    sta_autoconnect_attempted = false;
-  }
-  return err;
-}
-
-void Gateway::set_sta_autoconnect_attempted(bool value) {
-  sta_autoconnect_attempted = value;
-}
-
 esp_err_t Gateway::start_mdns() {
   return mdns_service.start(mdns_service.config());
 }
@@ -205,20 +212,6 @@ esp_err_t Gateway::start_mdns(const MdnsConfig &config) {
 
 esp_err_t Gateway::stop_mdns() {
   return mdns_service.stop();
-}
-
-void Gateway::set_softap_ssid(std::string_view ssid) {
-  if (ssid.empty()) {
-    return;
-  }
-
-  const std::size_t max_len = sizeof(softap_ssid) - 1;
-  const std::size_t copy_len = std::min(ssid.size(), max_len);
-
-  std::fill(std::begin(softap_ssid), std::end(softap_ssid), '\0');
-  std::copy(ssid.data(), ssid.data() + copy_len, softap_ssid);
-  softap_ssid_len = copy_len;
-  ap_config.ssid.assign(ssid.data(), copy_len);
 }
 
 } // namespace earbrain

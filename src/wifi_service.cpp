@@ -1,4 +1,4 @@
-#include "earbrain/gateway/gateway.hpp"
+#include "earbrain/gateway/wifi_service.hpp"
 #include "earbrain/gateway/logging.hpp"
 
 #include <algorithm>
@@ -21,16 +21,17 @@
 
 namespace earbrain {
 
-static constexpr const char wifi_tag[] = "gateway";
+static constexpr const char wifi_tag[] = "wifi";
 
 static constexpr uint8_t sta_listen_interval = 1;
 static constexpr int8_t sta_tx_power_qdbm = 78;
+static constexpr int sta_max_connect_retries = 5;
 
 static bool is_valid_ssid(std::string_view ssid) {
   return !ssid.empty() && ssid.size() <= 32;
 }
 
-static bool is_valid_passphrase_local(std::string_view passphrase) {
+static bool is_valid_passphrase(std::string_view passphrase) {
   const std::size_t len = passphrase.size();
   if (len == 0) {
     return true;
@@ -80,8 +81,7 @@ static wifi_config_t make_ap_config(const AccessPointConfig &config) {
 static wifi_config_t make_sta_config(const StationConfig &config) {
   wifi_config_t cfg{};
   std::fill(std::begin(cfg.sta.ssid), std::end(cfg.sta.ssid), '\0');
-  std::copy_n(config.ssid.data(), config.ssid.size(),
-              cfg.sta.ssid);
+  std::copy_n(config.ssid.data(), config.ssid.size(), cfg.sta.ssid);
 
   std::fill(std::begin(cfg.sta.password), std::end(cfg.sta.password), '\0');
   if (!config.passphrase.empty()) {
@@ -99,8 +99,6 @@ static wifi_config_t make_sta_config(const StationConfig &config) {
   return cfg;
 }
 
-static constexpr int sta_max_connect_retries = 5;
-
 static bool should_retry_reason(wifi_err_reason_t reason) {
   switch (reason) {
   case WIFI_REASON_AUTH_LEAVE:
@@ -112,7 +110,16 @@ static bool should_retry_reason(wifi_err_reason_t reason) {
   }
 }
 
-esp_err_t Gateway::ensure_wifi_initialized() {
+WifiService::WifiService()
+  : softap_netif(nullptr), sta_netif(nullptr), ap_config{}, sta_config{},
+    initialized(false), started(false), ap_active(false), sta_active(false),
+    handlers_registered(false), sta_connecting(false), sta_connected(false),
+    sta_retry_count(0), sta_ip{},
+    sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
+    sta_last_error(ESP_OK), autoconnect_attempted(false), credentials_store{} {
+}
+
+esp_err_t WifiService::ensure_initialized() {
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
     err = nvs_flash_erase();
@@ -149,23 +156,23 @@ esp_err_t Gateway::ensure_wifi_initialized() {
     }
   }
 
-  if (!wifi_initialized) {
+  if (!initialized) {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     err = esp_wifi_init(&cfg);
     if (err != ESP_OK) {
       return err;
     }
-    wifi_initialized = true;
+    initialized = true;
   }
 
-  if (!wifi_credentials_store.is_loaded()) {
-    err = wifi_credentials_store.load();
+  if (!credentials_store.is_loaded()) {
+    err = credentials_store.load();
     if (err != ESP_OK) {
       return err;
     }
   }
 
-  err = register_wifi_event_handlers();
+  err = register_event_handlers();
   if (err != ESP_OK) {
     return err;
   }
@@ -173,31 +180,31 @@ esp_err_t Gateway::ensure_wifi_initialized() {
   return ESP_OK;
 }
 
-esp_err_t Gateway::register_wifi_event_handlers() {
-  if (wifi_handlers_registered) {
+esp_err_t WifiService::register_event_handlers() {
+  if (handlers_registered) {
     return ESP_OK;
   }
 
   esp_err_t err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                                             &Gateway::ip_event_handler, this);
+                                             &WifiService::ip_event_handler, this);
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
     return err;
   }
 
   err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED,
-                                   &Gateway::wifi_event_handler, this);
+                                   &WifiService::wifi_event_handler, this);
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                                 &Gateway::ip_event_handler);
+                                 &WifiService::ip_event_handler);
     return err;
   }
 
-  wifi_handlers_registered = true;
+  handlers_registered = true;
   return ESP_OK;
 }
 
-esp_err_t Gateway::apply_wifi_mode() {
-  if (!wifi_initialized) {
+esp_err_t WifiService::apply_mode() {
+  if (!initialized) {
     return ESP_ERR_WIFI_NOT_INIT;
   }
 
@@ -211,13 +218,13 @@ esp_err_t Gateway::apply_wifi_mode() {
   }
 
   if (mode == WIFI_MODE_NULL) {
-    if (wifi_started) {
+    if (started) {
       esp_err_t err = esp_wifi_stop();
       if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_INIT &&
           err != ESP_ERR_WIFI_NOT_STARTED) {
         return err;
       }
-      wifi_started = false;
+      started = false;
     }
     return esp_wifi_set_mode(WIFI_MODE_NULL);
   }
@@ -227,23 +234,23 @@ esp_err_t Gateway::apply_wifi_mode() {
     return err;
   }
 
-  if (!wifi_started) {
+  if (!started) {
     err = esp_wifi_start();
     if (err != ESP_OK) {
       return err;
     }
-    wifi_started = true;
+    started = true;
   }
 
   return ESP_OK;
 }
 
-esp_err_t Gateway::start_access_point(const AccessPointConfig &config) {
+esp_err_t WifiService::start_access_point(const AccessPointConfig &config) {
   if (!is_valid_ssid(config.ssid)) {
     return ESP_ERR_INVALID_ARG;
   }
 
-  esp_err_t err = ensure_wifi_initialized();
+  esp_err_t err = ensure_initialized();
   if (err != ESP_OK) {
     return err;
   }
@@ -253,7 +260,7 @@ esp_err_t Gateway::start_access_point(const AccessPointConfig &config) {
   const bool previous_state = ap_active;
   ap_active = true;
 
-  err = apply_wifi_mode();
+  err = apply_mode();
   if (err != ESP_OK) {
     ap_active = previous_state;
     return err;
@@ -262,28 +269,27 @@ esp_err_t Gateway::start_access_point(const AccessPointConfig &config) {
   err = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
   if (err != ESP_OK) {
     ap_active = previous_state;
-    apply_wifi_mode();
+    apply_mode();
     return err;
   }
 
   ap_config = config;
-  logging::infof(wifi_tag, "Access point enabled: %s",
-                 ap_config.ssid.c_str());
+  logging::infof(wifi_tag, "Access point enabled: %s", ap_config.ssid.c_str());
   start_station_with_saved_profile();
   return ESP_OK;
 }
 
-esp_err_t Gateway::start_access_point() {
+esp_err_t WifiService::start_access_point() {
   return start_access_point(ap_config);
 }
 
-esp_err_t Gateway::stop_access_point() {
+esp_err_t WifiService::stop_access_point() {
   if (!ap_active) {
     return ESP_OK;
   }
 
   ap_active = false;
-  esp_err_t err = apply_wifi_mode();
+  esp_err_t err = apply_mode();
   if (err != ESP_OK) {
     ap_active = true;
     return err;
@@ -293,14 +299,13 @@ esp_err_t Gateway::stop_access_point() {
   return ESP_OK;
 }
 
-esp_err_t Gateway::start_station(const StationConfig &config) {
-  if (!is_valid_ssid(config.ssid) ||
-      !is_valid_passphrase_local(config.passphrase)) {
+esp_err_t WifiService::start_station(const StationConfig &config) {
+  if (!is_valid_ssid(config.ssid) || !is_valid_passphrase(config.passphrase)) {
     sta_last_error = ESP_ERR_INVALID_ARG;
     return ESP_ERR_INVALID_ARG;
   }
 
-  esp_err_t err = ensure_wifi_initialized();
+  esp_err_t err = ensure_initialized();
   if (err != ESP_OK) {
     sta_last_error = err;
     return err;
@@ -309,11 +314,11 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
   const bool previous_state = sta_active;
   sta_active = true;
 
-  err = apply_wifi_mode();
+  err = apply_mode();
   if (err != ESP_OK) {
     sta_last_error = err;
     sta_active = previous_state;
-    apply_wifi_mode();
+    apply_mode();
     return err;
   }
 
@@ -323,7 +328,7 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
   if (err != ESP_OK) {
     sta_last_error = err;
     sta_active = previous_state;
-    apply_wifi_mode();
+    apply_mode();
     return err;
   }
 
@@ -343,7 +348,7 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
   if (err != ESP_OK && err != ESP_ERR_WIFI_CONN) {
     sta_last_error = err;
     sta_active = previous_state;
-    apply_wifi_mode();
+    apply_mode();
     return err;
   }
 
@@ -354,19 +359,18 @@ esp_err_t Gateway::start_station(const StationConfig &config) {
   sta_last_error = ESP_OK;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
   sta_ip.addr = 0;
-  logging::infof(wifi_tag,
-                 "Station connection started: ssid='%s' (len=%zu)",
+  logging::infof(wifi_tag, "Station connection started: ssid='%s' (len=%zu)",
                  sta_config.ssid.c_str(), sta_config.ssid.size());
   return ESP_OK;
 }
 
-esp_err_t Gateway::start_station() {
-  const esp_err_t init_err = ensure_wifi_initialized();
+esp_err_t WifiService::start_station() {
+  const esp_err_t init_err = ensure_initialized();
   if (init_err != ESP_OK) {
     return init_err;
   }
 
-  auto credentials = wifi_credentials_store.get();
+  auto credentials = credentials_store.get();
   if (!credentials) {
     return ESP_ERR_NOT_FOUND;
   }
@@ -375,12 +379,12 @@ esp_err_t Gateway::start_station() {
                  "Attempting auto-connect to saved SSID: '%s' (len=%zu)",
                  credentials->ssid.c_str(), credentials->ssid.size());
 
-  sta_autoconnect_attempted = true;
+  autoconnect_attempted = true;
 
   return start_station(*credentials);
 }
 
-esp_err_t Gateway::stop_station() {
+esp_err_t WifiService::stop_station() {
   if (!sta_active) {
     return ESP_OK;
   }
@@ -395,7 +399,7 @@ esp_err_t Gateway::stop_station() {
   const bool previous_state = sta_active;
   sta_active = false;
 
-  err = apply_wifi_mode();
+  err = apply_mode();
   if (err != ESP_OK) {
     sta_active = previous_state;
     sta_last_error = err;
@@ -412,26 +416,26 @@ esp_err_t Gateway::stop_station() {
   return ESP_OK;
 }
 
-void Gateway::ip_event_handler(void *arg, esp_event_base_t event_base,
-                               int32_t event_id, void *event_data) {
+void WifiService::ip_event_handler(void *arg, esp_event_base_t event_base,
+                            int32_t event_id, void *event_data) {
   if (event_base != IP_EVENT || event_id != IP_EVENT_STA_GOT_IP || !event_data) {
     return;
   }
-  auto *gateway = static_cast<Gateway *>(arg);
-  if (!gateway) {
+  auto *wifi = static_cast<WifiService *>(arg);
+  if (!wifi) {
     return;
   }
   const auto *event = static_cast<ip_event_got_ip_t *>(event_data);
-  gateway->on_sta_got_ip(*event);
+  wifi->on_sta_got_ip(*event);
 }
 
-void Gateway::wifi_event_handler(void *arg, esp_event_base_t event_base,
-                                 int32_t event_id, void *event_data) {
+void WifiService::wifi_event_handler(void *arg, esp_event_base_t event_base,
+                              int32_t event_id, void *event_data) {
   if (event_base != WIFI_EVENT) {
     return;
   }
-  auto *gateway = static_cast<Gateway *>(arg);
-  if (!gateway) {
+  auto *wifi = static_cast<WifiService *>(arg);
+  if (!wifi) {
     return;
   }
 
@@ -439,7 +443,7 @@ void Gateway::wifi_event_handler(void *arg, esp_event_base_t event_base,
   case WIFI_EVENT_STA_DISCONNECTED:
     if (event_data) {
       const auto *event = static_cast<wifi_event_sta_disconnected_t *>(event_data);
-      gateway->on_sta_disconnected(*event);
+      wifi->on_sta_disconnected(*event);
     }
     break;
   default:
@@ -447,7 +451,7 @@ void Gateway::wifi_event_handler(void *arg, esp_event_base_t event_base,
   }
 }
 
-void Gateway::on_sta_got_ip(const ip_event_got_ip_t &event) {
+void WifiService::on_sta_got_ip(const ip_event_got_ip_t &event) {
   sta_connecting = false;
   sta_connected = true;
   sta_retry_count = 0;
@@ -461,40 +465,36 @@ void Gateway::on_sta_got_ip(const ip_event_got_ip_t &event) {
   logging::infof(wifi_tag, "Station got IP: %s", ip_buffer);
 }
 
-void Gateway::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
+void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
   sta_connecting = false;
   sta_connected = false;
-  sta_last_disconnect_reason =
-      static_cast<wifi_err_reason_t>(event.reason);
+  sta_last_disconnect_reason = static_cast<wifi_err_reason_t>(event.reason);
   sta_ip.addr = 0;
   logging::warnf(wifi_tag, "Station disconnected (reason=%d)",
                  static_cast<int>(event.reason));
 
-  const wifi_err_reason_t reason =
-      static_cast<wifi_err_reason_t>(event.reason);
-  if (sta_active && should_retry_reason(reason) && sta_retry_count < sta_max_connect_retries) {
+  const wifi_err_reason_t reason = static_cast<wifi_err_reason_t>(event.reason);
+  if (sta_active && should_retry_reason(reason) &&
+      sta_retry_count < sta_max_connect_retries) {
     ++sta_retry_count;
     const esp_err_t err = esp_wifi_connect();
     if (err == ESP_OK || err == ESP_ERR_WIFI_CONN) {
-      logging::infof(wifi_tag,
-                     "Retrying station connection (attempt %d/%d)",
+      logging::infof(wifi_tag, "Retrying station connection (attempt %d/%d)",
                      sta_retry_count, sta_max_connect_retries);
     } else {
-      logging::warnf(wifi_tag,
-                     "Failed to trigger reconnect attempt %d: %s",
+      logging::warnf(wifi_tag, "Failed to trigger reconnect attempt %d: %s",
                      sta_retry_count, esp_err_to_name(err));
     }
   } else if (sta_retry_count >= sta_max_connect_retries) {
-    logging::warnf(wifi_tag,
-                   "Station retries exhausted after %d attempts",
+    logging::warnf(wifi_tag, "Station retries exhausted after %d attempts",
                    sta_max_connect_retries);
   }
 }
 
-WifiScanResult Gateway::perform_wifi_scan() {
+WifiScanResult WifiService::perform_scan() {
   WifiScanResult result{};
 
-  esp_err_t err = ensure_wifi_initialized();
+  esp_err_t err = ensure_initialized();
   if (err != ESP_OK) {
     result.error = err;
     return result;
@@ -505,13 +505,14 @@ WifiScanResult Gateway::perform_wifi_scan() {
     sta_active = true;
   }
 
-  err = apply_wifi_mode();
+  err = apply_mode();
   if (err != ESP_OK) {
     if (!previous_sta_active) {
       sta_active = false;
-      esp_err_t mode_err = apply_wifi_mode();
+      esp_err_t mode_err = apply_mode();
       if (mode_err != ESP_OK) {
-        logging::warnf(wifi_tag, "Failed to restore AP-only mode after scan setup: %s",
+        logging::warnf(wifi_tag,
+                       "Failed to restore AP-only mode after scan setup: %s",
                        esp_err_to_name(mode_err));
       }
     }
@@ -526,9 +527,10 @@ WifiScanResult Gateway::perform_wifi_scan() {
   if (err != ESP_OK) {
     if (!previous_sta_active) {
       sta_active = false;
-      esp_err_t mode_err = apply_wifi_mode();
+      esp_err_t mode_err = apply_mode();
       if (mode_err != ESP_OK) {
-        logging::warnf(wifi_tag, "Failed to restore AP-only mode after scan failure: %s",
+        logging::warnf(wifi_tag,
+                       "Failed to restore AP-only mode after scan failure: %s",
                        esp_err_to_name(mode_err));
       }
     }
@@ -551,9 +553,10 @@ WifiScanResult Gateway::perform_wifi_scan() {
 
   if (!previous_sta_active) {
     sta_active = false;
-    esp_err_t mode_err = apply_wifi_mode();
+    esp_err_t mode_err = apply_mode();
     if (mode_err != ESP_OK) {
-      logging::warnf(wifi_tag, "Failed to restore AP-only mode after scan: %s",
+      logging::warnf(wifi_tag,
+                     "Failed to restore AP-only mode after scan: %s",
                      esp_err_to_name(mode_err));
     }
   }
@@ -565,7 +568,8 @@ WifiScanResult Gateway::perform_wifi_scan() {
 
   result.networks.reserve(records.size());
   const bool is_connected = sta_connected;
-  const std::string current_ssid = is_connected ? sta_config.ssid : std::string{};
+  const std::string current_ssid =
+      is_connected ? sta_config.ssid : std::string{};
 
   for (const auto &record : records) {
     const char *ssid_raw = reinterpret_cast<const char *>(record.ssid);
@@ -581,7 +585,8 @@ WifiScanResult Gateway::perform_wifi_scan() {
     summary.channel = record.primary;
     summary.auth_mode = record.authmode;
     summary.hidden = record.ssid[0] == '\0';
-    summary.connected = is_connected && !current_ssid.empty() && current_ssid == summary.ssid;
+    summary.connected = is_connected && !current_ssid.empty() &&
+                        current_ssid == summary.ssid;
     result.networks.push_back(std::move(summary));
   }
 
@@ -594,8 +599,20 @@ WifiScanResult Gateway::perform_wifi_scan() {
   return result;
 }
 
-void Gateway::start_station_with_saved_profile() {
-  if (sta_autoconnect_attempted) {
+WifiStatus WifiService::status() const {
+  WifiStatus s;
+  s.ap_active = ap_active;
+  s.sta_active = sta_active;
+  s.sta_connecting = sta_connecting;
+  s.sta_connected = sta_connected;
+  s.sta_ip = sta_ip;
+  s.sta_last_disconnect_reason = sta_last_disconnect_reason;
+  s.sta_last_error = sta_last_error;
+  return s;
+}
+
+void WifiService::start_station_with_saved_profile() {
+  if (autoconnect_attempted) {
     return;
   }
 

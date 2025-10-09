@@ -7,7 +7,7 @@
 
 #include <string>
 
-namespace earbrain {
+namespace earbrain::json_model {
 
 struct WifiStatus {
   bool ap_active = false;
@@ -18,10 +18,6 @@ struct WifiStatus {
   wifi_err_reason_t disconnect_reason = WIFI_REASON_UNSPECIFIED;
   esp_err_t last_error = ESP_OK;
 };
-
-} // namespace earbrain
-
-namespace earbrain::json_model {
 
 inline json::Ptr to_json(const WifiStatus &status) {
   auto obj = json::object();

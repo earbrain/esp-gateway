@@ -121,7 +121,7 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
     logging::errorf("gateway", "Failed to start station: %s",
                     esp_err_to_name(sta_err));
   }
-  gateway->set_sta_autoconnect_attempted(true);
+  gateway->wifi().set_autoconnect_attempted(true);
 
   auto data = json::object();
   if (!data) {
