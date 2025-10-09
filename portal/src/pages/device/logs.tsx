@@ -82,11 +82,11 @@ export const DeviceLogsPage: FunctionalComponent<DeviceLogsPageProps> = () => {
         )}
         {logsError && <p class="error-text">{logsError}</p>}
         {hasEntries ? (
-          <div class="overflow-hidden rounded border border-slate-200">
-            <div class="max-h-96 overflow-x-auto overflow-y-auto">
+          <div class="flex flex-col overflow-hidden rounded border border-slate-200" style="height: calc(100vh - 20rem);">
+            <div class="flex-1 overflow-x-auto overflow-y-auto">
               <table class="w-full min-w-[560px] table-auto text-left text-sm text-slate-700">
-                <thead>
-                  <tr class="text-xs uppercase tracking-wide text-slate-500">
+                <thead class="sticky top-0 bg-white">
+                  <tr class="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
                     <th class="px-3 py-2">Time (ms)</th>
                     <th class="px-3 py-2">Level</th>
                     <th class="px-3 py-2">Tag</th>
@@ -124,7 +124,7 @@ export const DeviceLogsPage: FunctionalComponent<DeviceLogsPageProps> = () => {
               </table>
             </div>
             {logs?.has_more && (
-              <p class="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">
+              <p class="border-t border-slate-200 px-3 py-2 text-xs text-slate-500 bg-white">
                 Showing latest {entries.length} entries. More logs are available on the device.
               </p>
             )}
