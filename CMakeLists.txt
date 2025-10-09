@@ -27,6 +27,7 @@ idf_component_register(
         "src/http_server.cpp"
         "src/logging.cpp"
         "src/mdns_service.cpp"
+        "src/validation.cpp"
         "src/wifi_service.cpp"
         "src/wifi_credentials.cpp"
     INCLUDE_DIRS

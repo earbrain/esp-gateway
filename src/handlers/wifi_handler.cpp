@@ -1,7 +1,5 @@
 #include "earbrain/gateway/handlers/wifi_handler.hpp"
 
-#include <algorithm>
-#include <cctype>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -9,6 +7,7 @@
 
 #include "earbrain/gateway/gateway.hpp"
 #include "earbrain/gateway/logging.hpp"
+#include "earbrain/gateway/validation.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 #include "json/wifi_credentials.hpp"
@@ -21,19 +20,6 @@ namespace earbrain::handlers::wifi {
 namespace {
 
 constexpr std::size_t max_request_body_size = 1024;
-
-bool is_valid_passphrase(std::string_view passphrase) {
-  const std::size_t len = passphrase.size();
-  if (len >= 8 && len <= 63) {
-    return true;
-  }
-  if (len == 64) {
-    return std::all_of(passphrase.begin(), passphrase.end(), [](char ch) {
-      return std::isxdigit(static_cast<unsigned char>(ch));
-    });
-  }
-  return false;
-}
 
 } // namespace
 
@@ -79,12 +65,12 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
                                  message.c_str());
   }
 
-  if (credentials.ssid.empty() || credentials.ssid.size() > 32) {
+  if (!validation::is_valid_ssid(credentials.ssid)) {
     return http::send_fail_field(req, "ssid",
                                  "ssid must be 1-32 characters.");
   }
 
-  if (!is_valid_passphrase(credentials.passphrase)) {
+  if (!validation::is_valid_passphrase(credentials.passphrase)) {
     return http::send_fail_field(req, "passphrase",
                                  "Passphrase must be 8-63 chars or 64 hex.");
   }

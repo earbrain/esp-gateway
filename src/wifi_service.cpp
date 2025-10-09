@@ -1,8 +1,8 @@
 #include "earbrain/gateway/wifi_service.hpp"
 #include "earbrain/gateway/logging.hpp"
+#include "earbrain/gateway/validation.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <cstdio>
 #include <string>
 #include <string_view>
@@ -26,26 +26,6 @@ static constexpr const char wifi_tag[] = "wifi";
 static constexpr uint8_t sta_listen_interval = 1;
 static constexpr int8_t sta_tx_power_qdbm = 78;
 static constexpr int sta_max_connect_retries = 5;
-
-static bool is_valid_ssid(std::string_view ssid) {
-  return !ssid.empty() && ssid.size() <= 32;
-}
-
-static bool is_valid_passphrase(std::string_view passphrase) {
-  const std::size_t len = passphrase.size();
-  if (len == 0) {
-    return true;
-  }
-  if (len >= 8 && len <= 63) {
-    return true;
-  }
-  if (len == 64) {
-    return std::all_of(passphrase.begin(), passphrase.end(), [](char ch) {
-      return std::isxdigit(static_cast<unsigned char>(ch));
-    });
-  }
-  return false;
-}
 
 static int signal_quality_from_rssi(int32_t rssi) {
   if (rssi <= -100) {
@@ -246,7 +226,7 @@ esp_err_t WifiService::apply_mode() {
 }
 
 esp_err_t WifiService::start_access_point(const AccessPointConfig &config) {
-  if (!is_valid_ssid(config.ssid)) {
+  if (!validation::is_valid_ssid(config.ssid)) {
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -300,7 +280,8 @@ esp_err_t WifiService::stop_access_point() {
 }
 
 esp_err_t WifiService::start_station(const StationConfig &config) {
-  if (!is_valid_ssid(config.ssid) || !is_valid_passphrase(config.passphrase)) {
+  if (!validation::is_valid_ssid(config.ssid) ||
+      !validation::is_valid_passphrase(config.passphrase)) {
     sta_last_error = ESP_ERR_INVALID_ARG;
     return ESP_ERR_INVALID_ARG;
   }
