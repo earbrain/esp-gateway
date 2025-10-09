@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
 import { HomePage } from "./pages/home";
 import { DevicePage } from "./pages/device";
+import { DeviceInfoPage } from "./pages/device/info";
+import { DeviceMetricsPage } from "./pages/device/metrics";
+import { DeviceLogsPage } from "./pages/device/logs";
+import { DeviceMdnsPage } from "./pages/device/mdns";
 import { WifiPage } from "./pages/wifi";
 
 type NavItem = {
@@ -34,6 +38,30 @@ const pageMetaMap: Record<string, PageMeta> = {
     title: "Device",
     description: "View device details",
     breadcrumbs: [{ label: "Home", path: "/" }, { label: "Device" }],
+  },
+  "/device/info": {
+    showHeader: true,
+    title: "Device Information",
+    description: "View device model and firmware details",
+    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Device Info" }],
+  },
+  "/device/metrics": {
+    showHeader: true,
+    title: "System Metrics",
+    description: "Monitor memory and system health",
+    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Metrics" }],
+  },
+  "/device/logs": {
+    showHeader: true,
+    title: "Device Logs",
+    description: "View real-time device logs",
+    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Logs" }],
+  },
+  "/device/mdns": {
+    showHeader: true,
+    title: "mDNS Configuration",
+    description: "Check mDNS settings and status",
+    breadcrumbs: [{ label: "Home", path: "/" }, { label: "mDNS" }],
   },
   "/wifi": {
     showHeader: true,
@@ -147,6 +175,10 @@ export function App() {
         <Router onChange={handleRouteChange}>
           <HomePage path="/" onNavigate={navigate} />
           <DevicePage path="/device" />
+          <DeviceInfoPage path="/device/info" />
+          <DeviceMetricsPage path="/device/metrics" />
+          <DeviceLogsPage path="/device/logs" />
+          <DeviceMdnsPage path="/device/mdns" />
           <WifiPage path="/wifi" />
           <HomePage default onNavigate={navigate} />
         </Router>
