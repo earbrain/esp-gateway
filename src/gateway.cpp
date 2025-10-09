@@ -69,8 +69,8 @@ void Gateway::ensure_builtin_routes() {
       {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
       {"/api/v1/metrics", HTTP_GET, &handlers::metrics::handle_get},
       {"/api/v1/wifi/credentials", HTTP_POST, &handlers::wifi::handle_credentials_post},
-      {"/api/v1/wifi/status", HTTP_GET, &Gateway::handle_wifi_status_get},
-      {"/api/v1/wifi/scan", HTTP_GET, &Gateway::handle_wifi_scan_get},
+      {"/api/v1/wifi/status", HTTP_GET, &handlers::wifi::handle_status_get},
+      {"/api/v1/wifi/scan", HTTP_GET, &handlers::wifi::handle_scan_get},
       {"/api/v1/mdns", HTTP_GET, &handlers::mdns::handle_get},
       {"/api/v1/logs", HTTP_GET, &handlers::logs::handle_get},
   };
@@ -150,56 +150,6 @@ esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
     wifi_service.set_autoconnect_attempted(false);
   }
   return err;
-}
-
-esp_err_t Gateway::handle_wifi_status_get(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
-  if (!gateway) {
-    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
-  }
-
-  WifiStatus wifi_status = gateway->wifi_service.status();
-
-  json_model::WifiStatus status;
-  status.ap_active = wifi_status.ap_active;
-  status.sta_active = wifi_status.sta_active;
-  status.sta_connecting = wifi_status.sta_connecting;
-  status.sta_connected = wifi_status.sta_connected;
-  status.last_error = wifi_status.sta_last_error;
-  status.disconnect_reason = wifi_status.sta_last_disconnect_reason;
-
-  const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&wifi_status.sta_ip);
-  char ip_buffer[16] = {0};
-  if (wifi_status.sta_connected && ip4addr_ntoa_r(ip4, ip_buffer, sizeof(ip_buffer))) {
-    status.ip = ip_buffer;
-  }
-
-  auto data = json_model::to_json(status);
-  if (!data) {
-    return ESP_ERR_NO_MEM;
-  }
-
-  return http::send_success(req, std::move(data));
-}
-
-esp_err_t Gateway::handle_wifi_scan_get(httpd_req_t *req) {
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
-  if (!gateway) {
-    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
-  }
-
-  WifiScanResult result = gateway->wifi_service.perform_scan();
-
-  if (result.error != ESP_OK) {
-    return http::send_error(req, "Wi-Fi scan failed", esp_err_to_name(result.error));
-  }
-
-  auto payload = json_model::to_json(result);
-  if (!payload) {
-    return ESP_ERR_NO_MEM;
-  }
-
-  return http::send_success(req, std::move(payload));
 }
 
 esp_err_t Gateway::start_mdns() {

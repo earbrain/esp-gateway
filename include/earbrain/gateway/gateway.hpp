@@ -40,8 +40,6 @@ public:
 
 private:
   void ensure_builtin_routes();
-  static esp_err_t handle_wifi_status_get(httpd_req_t *req);
-  static esp_err_t handle_wifi_scan_get(httpd_req_t *req);
 
   WifiService wifi_service;
   HttpServer http_server;

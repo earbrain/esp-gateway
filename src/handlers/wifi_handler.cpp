@@ -12,6 +12,9 @@
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 #include "json/wifi_credentials.hpp"
+#include "json/wifi_status.hpp"
+#include "json/wifi_scan.hpp"
+#include "lwip/ip4_addr.h"
 
 namespace earbrain::handlers::wifi {
 
@@ -139,6 +142,56 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
   }
 
   return http::send_success(req, std::move(data));
+}
+
+esp_err_t handle_status_get(httpd_req_t *req) {
+  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  if (!gateway) {
+    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+  }
+
+  WifiStatus wifi_status = gateway->wifi().status();
+
+  json_model::WifiStatus status;
+  status.ap_active = wifi_status.ap_active;
+  status.sta_active = wifi_status.sta_active;
+  status.sta_connecting = wifi_status.sta_connecting;
+  status.sta_connected = wifi_status.sta_connected;
+  status.last_error = wifi_status.sta_last_error;
+  status.disconnect_reason = wifi_status.sta_last_disconnect_reason;
+
+  const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&wifi_status.sta_ip);
+  char ip_buffer[16] = {0};
+  if (wifi_status.sta_connected && ip4addr_ntoa_r(ip4, ip_buffer, sizeof(ip_buffer))) {
+    status.ip = ip_buffer;
+  }
+
+  auto data = json_model::to_json(status);
+  if (!data) {
+    return ESP_ERR_NO_MEM;
+  }
+
+  return http::send_success(req, std::move(data));
+}
+
+esp_err_t handle_scan_get(httpd_req_t *req) {
+  auto *gateway = static_cast<Gateway *>(req->user_ctx);
+  if (!gateway) {
+    return http::send_error(req, "Gateway unavailable", "gateway_unavailable");
+  }
+
+  WifiScanResult result = gateway->wifi().perform_scan();
+
+  if (result.error != ESP_OK) {
+    return http::send_error(req, "Wi-Fi scan failed", esp_err_to_name(result.error));
+  }
+
+  auto payload = json_model::to_json(result);
+  if (!payload) {
+    return ESP_ERR_NO_MEM;
+  }
+
+  return http::send_success(req, std::move(payload));
 }
 
 } // namespace earbrain::handlers::wifi
