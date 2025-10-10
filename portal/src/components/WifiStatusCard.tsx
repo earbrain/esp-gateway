@@ -1,7 +1,6 @@
 import { useMemo } from "preact/hooks";
 import type { FunctionalComponent } from "preact";
 import { useApi } from "../hooks/useApi";
-import { usePolling } from "../hooks/usePolling";
 import type { WifiStatus } from "../types/wifi";
 
 const Spinner = () => (
@@ -18,10 +17,6 @@ export const WifiStatusCard: FunctionalComponent = () => {
     execute: fetchStatus,
   } = useApi<WifiStatus>("/api/v1/wifi/status", {
     method: "GET",
-  });
-
-  usePolling(() => fetchStatus(), {
-    intervalMs: 5000,
   });
 
   const statusSummary = useMemo(() => {
