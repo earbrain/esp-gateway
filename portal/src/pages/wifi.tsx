@@ -4,49 +4,39 @@ import { useApi } from "../hooks/useApi";
 import { usePolling } from "../hooks/usePolling";
 import { Toast } from "../components/Toast";
 import { WifiStatusCard } from "../components/WifiStatusCard";
+import { WifiNetworkCard } from "../components/wifi/WifiNetworkCard";
+import type { WifiNetwork, WifiScanResponse, WifiStatus } from "../types/wifi";
 
 type WifiPageProps = {
   path?: string;
 };
 
-type WifiFormValues = {
-  ssid: string;
-  passphrase: string;
+const prioritizeConnected = (list: WifiNetwork[]): WifiNetwork[] => {
+  const connectedIndex = list.findIndex((network) => network.connected);
+  if (connectedIndex <= 0) {
+    return list;
+  }
+  const connected = list[connectedIndex];
+  return [
+    connected,
+    ...list.slice(0, connectedIndex),
+    ...list.slice(connectedIndex + 1),
+  ];
 };
 
-type WifiResponse = {
-  restart_required?: boolean;
-  sta_connect_started?: boolean;
-  sta_error?: string;
-};
-
-type WifiStatus = {
-  ap_active: boolean;
-  sta_active: boolean;
-  sta_connecting: boolean;
-  sta_connected: boolean;
-  sta_error: string;
-  ip: string;
-  disconnect_reason: number;
-};
-
-const isHexKey = (value: string) => /^[0-9a-fA-F]+$/.test(value);
+// Loading spinner
+const LoadingSpinner: FunctionalComponent<{ label?: string }> = ({ label }) => (
+  <div class="mt-4 flex items-center gap-2 text-sm text-slate-500" role="status" aria-live="polite">
+    <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sky-500"></span>
+    <span>{label ?? "Loading..."}</span>
+  </div>
+);
 
 export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
-  const [values, setValues] = useState<WifiFormValues>({
-    ssid: "",
-    passphrase: "",
-  });
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [networks, setNetworks] = useState<WifiNetwork[]>([]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-
-  const { execute, loading, error, reset } = useApi<WifiResponse>("/api/v1/wifi/credentials", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+  const [isScanning, setIsScanning] = useState(false);
+  const [hasScanned, setHasScanned] = useState(false);
 
   const {
     data: status,
@@ -57,26 +47,35 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
     method: "GET",
   });
 
+  const {
+    data: scanResult,
+    error: scanError,
+    execute: executeScan,
+  } = useApi<WifiScanResponse>("/api/v1/wifi/scan", {
+    method: "GET",
+  });
+
   const { refresh: refreshStatus } = usePolling(() => fetchStatus(), {
     intervalMs: 5000,
   });
 
-  const lastCredentialError = useRef<string | null>(null);
   const lastStatusError = useRef<string | null>(null);
+  const lastScanError = useRef<string | null>(null);
 
   const showToast = useCallback((type: "success" | "error", message: string) => {
     setToast({ type, message });
   }, []);
 
-  useEffect(() => {
-    if (error && error !== lastCredentialError.current) {
-      showToast("error", error);
-      lastCredentialError.current = error;
+  const triggerScan = useCallback(async () => {
+    setIsScanning(true);
+    try {
+      await executeScan({ url: "/api/v1/wifi/scan" });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsScanning(false);
     }
-    if (!error) {
-      lastCredentialError.current = null;
-    }
-  }, [error, showToast]);
+  }, [executeScan]);
 
   useEffect(() => {
     if (statusError && statusError !== lastStatusError.current) {
@@ -88,18 +87,66 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
     }
   }, [showToast, statusError]);
 
+  useEffect(() => {
+    if (scanError && scanError !== lastScanError.current) {
+      showToast("error", scanError);
+      lastScanError.current = scanError;
+    }
+    if (!scanError) {
+      lastScanError.current = null;
+    }
+  }, [scanError, showToast]);
+
+  useEffect(() => {
+    if (!scanResult) {
+      return;
+    }
+
+    setHasScanned(true);
+
+    if (scanResult.error && scanResult.error.length > 0) {
+      return;
+    }
+
+    setNetworks((prev) => {
+      const previous = new Map<string, WifiNetwork>(prev.map((item) => [item.id, item]));
+      const next = scanResult.networks
+        .filter((network) => network.ssid.trim().length > 0)
+        .map((network) => {
+          const normalizedBssid = network.bssid.trim().toLowerCase();
+          const id = normalizedBssid.length > 0 ? normalizedBssid : `${network.ssid}-${network.channel}`;
+          const existing = previous.get(id);
+          return {
+            id,
+            ssid: network.ssid,
+            signal: Math.max(0, Math.min(100, Math.round(network.signal))),
+            security: network.security,
+            connected: network.connected,
+            hidden: network.hidden,
+            bssid: network.bssid,
+            rssi: network.rssi,
+            lastPassphrase: existing?.lastPassphrase ?? "",
+          };
+        });
+      return prioritizeConnected(next);
+    });
+  }, [scanResult]);
+
   const statusSummary = useMemo(() => {
     if (!status) {
-      return statusLoading ? "Checking Wi-Fi status..." : "Status unavailable";
+      if (statusLoading) {
+        return "Checking Wi-Fi status...";
+      }
+      return "Status unavailable";
+    }
+    if (status.sta_error && status.sta_error.length > 0) {
+      return `Connection error: ${status.sta_error}`;
     }
     if (status.sta_connected) {
       return status.ip ? `Connected to ${status.ip}` : "Connected";
     }
     if (status.sta_connecting) {
       return "Connecting to network...";
-    }
-    if (status.sta_error && status.sta_error.length > 0) {
-      return `Connection error: ${status.sta_error}`;
     }
     return "Not connected";
   }, [status, statusLoading]);
@@ -138,15 +185,6 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
           : "status-pill bg-slate-200 text-slate-600",
       };
     }
-    if (status.sta_connected) {
-      return {
-        label: "Connected",
-        description: status.ip
-          ? `Client connected with IP ${status.ip}.`
-          : "Client connected to Wi-Fi network.",
-        badgeClass: "status-pill bg-emerald-100 text-emerald-700",
-      };
-    }
     if (status.sta_connecting) {
       return {
         label: "Connecting",
@@ -161,6 +199,15 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
         badgeClass: "status-pill bg-rose-100 text-rose-700",
       };
     }
+    if (status.sta_connected) {
+      return {
+        label: "Connected",
+        description: status.ip
+          ? `Client connected with IP ${status.ip}.`
+          : "Client connected to Wi-Fi network.",
+        badgeClass: "status-pill bg-emerald-100 text-emerald-700",
+      };
+    }
     return {
       label: "Not connected",
       description: "STA client is idle.",
@@ -168,63 +215,21 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
     };
   }, [status, statusLoading]);
 
-  const handleInputChange = (field: keyof WifiFormValues) => (event: Event) => {
-    const target = event.currentTarget as HTMLInputElement | null;
-    if (target) {
-      setValues((prev) => ({ ...prev, [field]: target.value }));
+  const handleScan = () => {
+    if (!isScanning) {
+      void triggerScan();
     }
   };
 
-  const handleSubmit = async (event: Event) => {
-    event.preventDefault();
-
-    const trimmedSsid = values.ssid.trim();
-    const passphrase = values.passphrase;
-
-    const isLengthValid = passphrase.length >= 8 && passphrase.length <= 63;
-    const isHexCandidate = passphrase.length === 64 && isHexKey(passphrase);
-
-    if (!trimmedSsid) {
-      setValidationError("Please enter an SSID.");
-      reset();
-      return;
-    }
-
-    if (!isLengthValid && !isHexCandidate) {
-      setValidationError("Password must be 8-63 characters or a 64-digit hex string.");
-      reset();
-      return;
-    }
-
-    setValidationError(null);
-
-    try {
-      const response = await execute({
-        body: JSON.stringify({
-          ssid: trimmedSsid,
-          passphrase,
-        }),
-      });
-
-      if (response) {
-        const { restart_required, sta_connect_started, sta_error } = response;
-        const messageParts: string[] = ["Saved credentials."];
-        if (sta_connect_started) {
-          messageParts.push("Starting STA connection...");
-        } else if (typeof restart_required === "boolean" && restart_required) {
-          messageParts.push("Restart is required to apply changes.");
-        }
-        if (sta_error) {
-          messageParts.push(`Error: ${sta_error}`);
-        }
-        showToast(sta_error ? "error" : "success", messageParts.join(" "));
-        setValues({ ssid: trimmedSsid, passphrase });
-        refreshStatus();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  const handlePasswordSaved = useCallback((networkId: string, password: string) => {
+    setNetworks((prev) =>
+      prev.map((network) =>
+        network.id === networkId
+          ? { ...network, lastPassphrase: password }
+          : network
+      )
+    );
+  }, []);
 
   return (
     <>
@@ -238,58 +243,51 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
         </div>
       )}
       <section class="space-y-6">
-        <div class="card" id="wifi-settings-panel">
-          <h2 class="section-title">Update Credentials</h2>
-          <form class="grid gap-4" onSubmit={handleSubmit}>
-            <label class="form-field">
-              <span>SSID</span>
-              <input
-                type="text"
-                value={values.ssid}
-                onInput={handleInputChange("ssid")}
-                placeholder="e.g. gateway-ap"
-                required
-                class="input"
-              />
-            </label>
-            <label class="form-field">
-              <span>Password</span>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={values.passphrase}
-                onInput={handleInputChange("passphrase")}
-                placeholder="8-63 chars or 64-digit hex"
-                minLength={8}
-                maxLength={64}
-                required
-                class="input"
-              />
-            </label>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={showPassword}
-                onChange={() => setShowPassword((prev) => !prev)}
-                class="h-4 w-4"
-              />
-              Show password
-            </label>
-            <div class="flex items-center justify-end">
-              <button type="submit" disabled={loading} class="btn-primary">
-                {loading ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </form>
-          {validationError && <p class="error-text">{validationError}</p>}
-        </div>
         <WifiStatusCard
           apState={apState}
           staState={staState}
           status={status}
-          loading={statusLoading || loading}
+          loading={statusLoading}
           onRefresh={refreshStatus}
           summary={statusSummary}
         />
+        <div class="card">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="section-title !mb-1">Available Networks</h2>
+              <p class="text-sm text-slate-500">
+                Choose a nearby Wi-Fi network and enter the password if required.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn-secondary"
+              onClick={handleScan}
+              disabled={isScanning}
+            >
+              {isScanning ? "Scanning..." : hasScanned ? "Rescan" : "Scan"}
+            </button>
+          </div>
+          {isScanning && <LoadingSpinner label="Scanning for networks..." />}
+          <div class="mt-5 grid gap-2">
+            {networks.map((network) => (
+              <WifiNetworkCard
+                key={network.id}
+                network={network}
+                onPasswordSaved={handlePasswordSaved}
+              />
+            ))}
+          </div>
+          {networks.length === 0 && (
+            <div class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+              {isScanning
+                ? "Scanning nearby networks..."
+                : hasScanned
+                  ? "No networks found. Try scanning again."
+                  : "Press Scan to search for nearby networks."}
+            </div>
+          )}
+        </div>
       </section>
     </>
   );

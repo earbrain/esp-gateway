@@ -157,9 +157,7 @@ export function App() {
                     key={item.path}
                     type="button"
                     role="menuitem"
-                    class={`menu-item${
-                      normalizedUrl === item.path ? " menu-item-active" : ""
-                    }`}
+                    class={`menu-item${normalizedUrl === item.path ? " menu-item-active" : ""}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       navigate(item.path);

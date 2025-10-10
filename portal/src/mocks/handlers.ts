@@ -1,5 +1,14 @@
 import { http, HttpResponse, delay } from "msw";
 
+const wifiState = {
+  sta_connecting: false,
+  sta_connected: false,
+  sta_error: "",
+  ip: "",
+  disconnect_reason: 0,
+  connectedSsid: "",
+};
+
 export const handlers = [
   // Device information
   http.get("/api/v1/device", async () => {
@@ -56,12 +65,85 @@ export const handlers = [
       status: "success",
       data: {
         ap_active: true,
-        sta_active: false,
-        sta_connecting: false,
-        sta_connected: false,
-        sta_error: "",
-        ip: "",
-        disconnect_reason: 0,
+        sta_active: wifiState.sta_connected || wifiState.sta_connecting,
+        sta_connecting: wifiState.sta_connecting,
+        sta_connected: wifiState.sta_connected,
+        sta_error: wifiState.sta_error,
+        ip: wifiState.ip,
+        disconnect_reason: wifiState.disconnect_reason,
+      },
+    });
+  }),
+
+  // Wi-Fi scan
+  http.get("/api/v1/wifi/scan", async () => {
+    await delay(800); // Simulate scan time
+    return HttpResponse.json({
+      status: "success",
+      data: {
+        networks: [
+          {
+            ssid: "MyHomeNetwork",
+            bssid: "aa:bb:cc:dd:ee:01",
+            signal: 85,
+            security: "WPA2",
+            connected: wifiState.connectedSsid === "MyHomeNetwork" && wifiState.sta_connected,
+            hidden: false,
+            rssi: -45,
+            channel: 6,
+          },
+          {
+            ssid: "OfficeWiFi",
+            bssid: "aa:bb:cc:dd:ee:02",
+            signal: 72,
+            security: "WPA2/WPA3",
+            connected: wifiState.connectedSsid === "OfficeWiFi" && wifiState.sta_connected,
+            hidden: false,
+            rssi: -58,
+            channel: 11,
+          },
+          {
+            ssid: "GuestNetwork",
+            bssid: "aa:bb:cc:dd:ee:03",
+            signal: 60,
+            security: "Open",
+            connected: wifiState.connectedSsid === "GuestNetwork" && wifiState.sta_connected,
+            hidden: false,
+            rssi: -65,
+            channel: 1,
+          },
+          {
+            ssid: "Neighbor_2.4GHz",
+            bssid: "aa:bb:cc:dd:ee:04",
+            signal: 45,
+            security: "WPA2",
+            connected: wifiState.connectedSsid === "Neighbor_2.4GHz" && wifiState.sta_connected,
+            hidden: false,
+            rssi: -75,
+            channel: 3,
+          },
+          {
+            ssid: "CoffeeShop",
+            bssid: "aa:bb:cc:dd:ee:05",
+            signal: 38,
+            security: "Open",
+            connected: wifiState.connectedSsid === "CoffeeShop" && wifiState.sta_connected,
+            hidden: false,
+            rssi: -80,
+            channel: 9,
+          },
+          {
+            ssid: "SecureNetwork",
+            bssid: "aa:bb:cc:dd:ee:06",
+            signal: 55,
+            security: "WPA3",
+            connected: wifiState.connectedSsid === "SecureNetwork" && wifiState.sta_connected,
+            hidden: false,
+            rssi: -70,
+            channel: 6,
+          },
+        ],
+        error: "",
       },
     });
   }),
@@ -69,8 +151,40 @@ export const handlers = [
   // Wi-Fi credentials (POST)
   http.post("/api/v1/wifi/credentials", async ({ request }) => {
     await delay(300);
-    const body = await request.json();
+    const body = (await request.json()) as { ssid: string; passphrase: string };
     console.log("Mock: Received Wi-Fi credentials", body);
+
+    // Simulate connection process
+    wifiState.sta_connecting = true;
+    wifiState.sta_connected = false;
+    wifiState.sta_error = "";
+    wifiState.ip = "";
+    wifiState.connectedSsid = "";
+
+    // Simulate successful connection after a delay
+    setTimeout(() => {
+      // Simulate successful connection (95% success rate)
+      const isSuccess = Math.random() > 0.05;
+
+      if (isSuccess) {
+        wifiState.sta_connecting = false;
+        wifiState.sta_connected = true;
+        wifiState.sta_error = "";
+        wifiState.ip = "192.168.1." + Math.floor(Math.random() * 200 + 10);
+        wifiState.connectedSsid = body.ssid;
+        wifiState.disconnect_reason = 0;
+        console.log(`Mock: Successfully connected to ${body.ssid}`);
+      } else {
+        // Simulate connection failure
+        wifiState.sta_connecting = false;
+        wifiState.sta_connected = false;
+        wifiState.sta_error = "Authentication failed";
+        wifiState.ip = "";
+        wifiState.connectedSsid = "";
+        wifiState.disconnect_reason = 15; // AUTH_EXPIRE
+        console.log(`Mock: Failed to connect to ${body.ssid}`);
+      }
+    }, 2000);
 
     return HttpResponse.json({
       status: "success",
