@@ -5,6 +5,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+// Simple custom middleware that adds a custom header
+static esp_err_t add_custom_header(httpd_req_t *req) {
+  httpd_resp_set_hdr(req, "X-Custom", "HelloWorld");
+  return ESP_OK;
+}
+
 static esp_err_t custom_hello_handler(httpd_req_t *req) {
   static constexpr char payload[] = R"({"message":"hello"})";
   httpd_resp_set_type(req, "application/json");
@@ -16,9 +22,13 @@ extern "C" void app_main(void) {
 
   earbrain::Gateway gateway;
 
-  earbrain::RouteOptions opts;
-  opts.middlewares = {earbrain::middleware::log_request};
-  if (gateway.add_route("/api/ext/hello", HTTP_GET, &custom_hello_handler, opts) != ESP_OK) {
+  // Apply logging middleware globally to all routes
+  gateway.server().use(earbrain::middleware::log_request);
+
+  // Add custom route with route-specific middleware
+  earbrain::RouteOptions hello_opts;
+  hello_opts.middlewares = {add_custom_header};
+  if (gateway.add_route("/api/ext/hello", HTTP_GET, &custom_hello_handler, hello_opts) != ESP_OK) {
     earbrain::logging::error("Failed to register /api/ext/hello", TAG);
     return;
   }

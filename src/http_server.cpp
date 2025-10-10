@@ -10,6 +10,17 @@ esp_err_t middleware_wrapper(httpd_req_t *req) {
     return ESP_FAIL;
   }
 
+  // Execute global middlewares
+  if (route->server) {
+    for (auto middleware : route->server->get_global_middlewares()) {
+      esp_err_t err = middleware(req);
+      if (err != ESP_OK) {
+        return ESP_OK;
+      }
+    }
+  }
+
+  // Route-specific middlewares
   for (auto middleware : route->middlewares) {
     esp_err_t err = middleware(req);
     if (err != ESP_OK) {
@@ -24,15 +35,16 @@ esp_err_t middleware_wrapper(httpd_req_t *req) {
 } // namespace
 
 UriHandler::UriHandler(std::string_view path, httpd_method_t m,
-                       RequestHandler h, void *ctx)
-  : uri(path), method(m), handler(h), user_ctx(ctx), descriptor{}, middlewares{} {
+                       RequestHandler h, void *ctx, HttpServer *srv)
+  : uri(path), method(m), handler(h), user_ctx(ctx), descriptor{},
+    middlewares{}, server(srv) {
   refresh_descriptor();
 }
 
 UriHandler::UriHandler(std::string_view path, httpd_method_t m,
-                       RequestHandler h, const RouteOptions &opts)
+                       RequestHandler h, const RouteOptions &opts, HttpServer *srv)
   : uri(path), method(m), handler(h), user_ctx(opts.user_ctx),
-    descriptor{}, middlewares(opts.middlewares) {
+    descriptor{}, middlewares(opts.middlewares), server(srv) {
   refresh_descriptor();
 }
 
@@ -40,7 +52,12 @@ void UriHandler::refresh_descriptor() {
   descriptor.uri = uri.c_str();
   descriptor.method = method;
 
-  if (!middlewares.empty()) {
+  bool has_middlewares = !middlewares.empty();
+  if (!has_middlewares && server) {
+    has_middlewares = !server->get_global_middlewares().empty();
+  }
+
+  if (has_middlewares) {
     descriptor.handler = &middleware_wrapper;
     descriptor.user_ctx = this;
   } else {
@@ -116,7 +133,7 @@ esp_err_t HttpServer::add_route(std::string_view uri, httpd_method_t method,
     return ESP_ERR_INVALID_STATE;
   }
 
-  auto entry = std::make_unique<UriHandler>(uri, method, handler, user_ctx);
+  auto entry = std::make_unique<UriHandler>(uri, method, handler, user_ctx, this);
   UriHandler &route = *entry;
 
   if (handle) {
@@ -140,7 +157,7 @@ esp_err_t HttpServer::add_route(std::string_view uri, httpd_method_t method,
     return ESP_ERR_INVALID_STATE;
   }
 
-  auto entry = std::make_unique<UriHandler>(uri, method, handler, options);
+  auto entry = std::make_unique<UriHandler>(uri, method, handler, options, this);
   UriHandler &route = *entry;
 
   if (handle) {
@@ -170,6 +187,18 @@ esp_err_t HttpServer::register_route_with_server(UriHandler &route) const {
 
   route.refresh_descriptor();
   return httpd_register_uri_handler(handle, &route.descriptor);
+}
+
+void HttpServer::use(Middleware middleware) {
+  global_middlewares.push_back(middleware);
+  for (auto &route : routes) {
+    if (handle) {
+      httpd_unregister_uri_handler(handle, route->uri.c_str(), route->method);
+      register_route_with_server(*route);
+    } else {
+      route->refresh_descriptor();
+    }
+  }
 }
 
 } // namespace earbrain
