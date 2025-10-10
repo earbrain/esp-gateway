@@ -32,6 +32,15 @@ esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
                                user_ctx ? user_ctx : this);
 }
 
+esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
+                             RequestHandler handler, const RouteOptions &options) {
+  RouteOptions opts = options;
+  if (!opts.user_ctx) {
+    opts.user_ctx = this;
+  }
+  return http_server.add_route(uri, method, handler, opts);
+}
+
 void Gateway::ensure_builtin_routes() {
   if (builtin_routes_registered) {
     return;

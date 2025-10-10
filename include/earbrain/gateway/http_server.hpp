@@ -10,10 +10,18 @@
 namespace earbrain {
 
 using RequestHandler = esp_err_t (*)(httpd_req_t *);
+using Middleware = esp_err_t (*)(httpd_req_t *);
+
+struct RouteOptions {
+  std::vector<Middleware> middlewares;
+  void *user_ctx = nullptr;
+};
 
 struct UriHandler {
   UriHandler(std::string_view path, httpd_method_t m, RequestHandler h,
              void *ctx);
+  UriHandler(std::string_view path, httpd_method_t m, RequestHandler h,
+             const RouteOptions &opts);
   void refresh_descriptor();
 
   std::string uri;
@@ -21,6 +29,7 @@ struct UriHandler {
   RequestHandler handler;
   void *user_ctx;
   httpd_uri_t descriptor;
+  std::vector<Middleware> middlewares;
 };
 
 class HttpServer {
@@ -35,6 +44,8 @@ public:
 
   esp_err_t add_route(std::string_view uri, httpd_method_t method,
                       RequestHandler handler, void *user_ctx = nullptr);
+  esp_err_t add_route(std::string_view uri, httpd_method_t method,
+                      RequestHandler handler, const RouteOptions &options);
   bool has_route(std::string_view uri, httpd_method_t method) const;
 
 private:

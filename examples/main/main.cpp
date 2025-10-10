@@ -1,4 +1,5 @@
 #include "earbrain/gateway/gateway.hpp"
+#include "earbrain/gateway/middlewares/logging.hpp"
 #include "esp_err.h"
 #include "earbrain/gateway/logging.hpp"
 #include "freertos/FreeRTOS.h"
@@ -15,8 +16,9 @@ extern "C" void app_main(void) {
 
   earbrain::Gateway gateway;
 
-  // Register user custom API
-  if (gateway.add_route("/api/ext/hello", HTTP_GET, &custom_hello_handler) != ESP_OK) {
+  earbrain::RouteOptions opts;
+  opts.middlewares = {earbrain::middleware::log_request};
+  if (gateway.add_route("/api/ext/hello", HTTP_GET, &custom_hello_handler, opts) != ESP_OK) {
     earbrain::logging::error("Failed to register /api/ext/hello", TAG);
     return;
   }

@@ -35,6 +35,8 @@ public:
 
   esp_err_t add_route(std::string_view uri, httpd_method_t method,
                       RequestHandler handler, void *user_ctx = nullptr);
+  esp_err_t add_route(std::string_view uri, httpd_method_t method,
+                      RequestHandler handler, const RouteOptions &options);
 
   static const char *version() { return "0.0.0"; }
 
