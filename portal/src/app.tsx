@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "preact/hooks";
 
 import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
 import { HomePage } from "./pages/home";
-import { DevicePage } from "./pages/device";
 import { DeviceInfoPage } from "./pages/device/info";
 import { DeviceMetricsPage } from "./pages/device/metrics";
 import { DeviceLogsPage } from "./pages/device/logs";
@@ -36,12 +35,6 @@ const normalizeUrl = (url: string) => {
 };
 
 const pageMetaMap: Record<string, PageMeta> = {
-  "/device": {
-    showHeader: true,
-    title: "Device",
-    description: "View device details",
-    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Device" }],
-  },
   "/device/info": {
     showHeader: true,
     title: "Device Information",
@@ -175,7 +168,6 @@ export function App() {
         <BreadcrumbSection meta={pageMeta} onNavigate={navigate} />
         <Router onChange={handleRouteChange}>
           <HomePage path="/" onNavigate={navigate} />
-          <DevicePage path="/device" />
           <DeviceInfoPage path="/device/info" />
           <DeviceMetricsPage path="/device/metrics" />
           <DeviceLogsPage path="/device/logs" />
