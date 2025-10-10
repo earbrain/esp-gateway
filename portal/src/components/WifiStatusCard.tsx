@@ -1,4 +1,4 @@
-import { useMemo } from "preact/hooks";
+import { useEffect, useMemo } from "preact/hooks";
 import type { FunctionalComponent } from "preact";
 import { useApi } from "../hooks/useApi";
 import type { WifiStatus } from "../types/wifi";
@@ -19,6 +19,10 @@ export const WifiStatusCard: FunctionalComponent = () => {
     method: "GET",
   });
 
+  useEffect(() => {
+    fetchStatus();
+  }, []);
+
   const statusSummary = useMemo(() => {
     if (!status) {
       if (statusLoading) {
@@ -26,11 +30,11 @@ export const WifiStatusCard: FunctionalComponent = () => {
       }
       return "Status unavailable";
     }
-    if (status.sta_error && status.sta_error.length > 0) {
-      return `Connection error: ${status.sta_error}`;
-    }
     if (status.sta_connected) {
       return status.ip ? `Connected to ${status.ip}` : "Connected";
+    }
+    if (status.sta_error && status.sta_error.length > 0) {
+      return `Connection error: ${status.sta_error}`;
     }
     if (status.sta_connecting) {
       return "Connecting to network...";
@@ -72,11 +76,13 @@ export const WifiStatusCard: FunctionalComponent = () => {
           : "status-pill bg-slate-200 text-slate-600",
       };
     }
-    if (status.sta_connecting) {
+    if (status.sta_connected) {
       return {
-        label: "Connecting",
-        description: "Attempting to join the configured network...",
-        badgeClass: "status-pill bg-amber-100 text-amber-700",
+        label: "Connected",
+        description: status.ip
+          ? `Client connected with IP ${status.ip}.`
+          : "Client connected to Wi-Fi network.",
+        badgeClass: "status-pill bg-emerald-100 text-emerald-700",
       };
     }
     if (status.sta_error && status.sta_error.length > 0) {
@@ -86,13 +92,11 @@ export const WifiStatusCard: FunctionalComponent = () => {
         badgeClass: "status-pill bg-rose-100 text-rose-700",
       };
     }
-    if (status.sta_connected) {
+    if (status.sta_connecting) {
       return {
-        label: "Connected",
-        description: status.ip
-          ? `Client connected with IP ${status.ip}.`
-          : "Client connected to Wi-Fi network.",
-        badgeClass: "status-pill bg-emerald-100 text-emerald-700",
+        label: "Connecting",
+        description: "Attempting to join the configured network...",
+        badgeClass: "status-pill bg-amber-100 text-amber-700",
       };
     }
     return {
