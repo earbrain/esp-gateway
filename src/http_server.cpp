@@ -64,7 +64,7 @@ esp_err_t HttpServer::start() {
   }
 
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  config.max_uri_handlers = 16;
+  config.max_uri_handlers = 32;
   config.lru_purge_enable = true;
   // Allow slower clients more time before the server aborts the socket on send/recv.
   config.recv_wait_timeout = 20;
