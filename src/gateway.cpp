@@ -55,12 +55,20 @@ void Gateway::ensure_builtin_routes() {
   };
 
   static constexpr BuiltinRoute routes_to_register[] = {
+      // Portal UI routes
       {"/", HTTP_GET, &handlers::portal::handle_root_get},
       {"/wifi", HTTP_GET, &handlers::portal::handle_root_get},
       {"/device", HTTP_GET, &handlers::portal::handle_root_get},
+      {"/device/info", HTTP_GET, &handlers::portal::handle_root_get},
+      {"/device/metrics", HTTP_GET, &handlers::portal::handle_root_get},
+      {"/device/logs", HTTP_GET, &handlers::portal::handle_root_get},
+      {"/device/mdns", HTTP_GET, &handlers::portal::handle_root_get},
+      // Portal assets
       {"/app.js", HTTP_GET, &handlers::portal::handle_app_js_get},
       {"/assets/index.css", HTTP_GET, &handlers::portal::handle_assets_css_get},
+      // Health check
       {"/health", HTTP_GET, &handlers::health::handle_health},
+      // REST API
       {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
       {"/api/v1/metrics", HTTP_GET, &handlers::metrics::handle_get},
       {"/api/v1/wifi/credentials", HTTP_POST, &handlers::wifi::handle_credentials_post},
