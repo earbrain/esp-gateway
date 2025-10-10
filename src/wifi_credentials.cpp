@@ -78,8 +78,8 @@ esp_err_t WifiCredentialStore::save(std::string_view ssid,
   nvs_close(handle);
 
   if (err == ESP_OK) {
-    saved_config_.ssid.assign(ssid.data(), ssid.size());
-    saved_config_.passphrase.assign(passphrase.data(), passphrase.size());
+    saved_config_.ssid = std::string(ssid);
+    saved_config_.passphrase = std::string(passphrase);
     loaded_ = true;
   }
 

@@ -48,14 +48,15 @@ extern "C" void app_main(void) {
     return;
   }
 
-  const esp_err_t sta_saved_err = gateway.start_station();
-  if (sta_saved_err == ESP_ERR_NOT_FOUND) {
-    earbrain::logging::info("No saved station credentials; AP mode only.", TAG);
-  } else if (sta_saved_err != ESP_OK) {
-    earbrain::logging::warnf(TAG, "Failed to start station with saved credentials: %s",
-                             esp_err_to_name(sta_saved_err));
+  // Attempt to connect to saved Wi-Fi credentials
+  const esp_err_t sta_err = gateway.start_station();
+  if (sta_err == ESP_ERR_NOT_FOUND) {
+    earbrain::logging::info("No saved Wi-Fi credentials found", TAG);
+  } else if (sta_err != ESP_OK) {
+    earbrain::logging::warnf(TAG, "Failed to connect to saved Wi-Fi: %s",
+                             esp_err_to_name(sta_err));
   } else {
-    earbrain::logging::info("Station auto-connect started using saved credentials", TAG);
+    earbrain::logging::info("Attempting to connect to saved Wi-Fi network", TAG);
   }
 
   earbrain::logging::info("Starting HTTP server", TAG);

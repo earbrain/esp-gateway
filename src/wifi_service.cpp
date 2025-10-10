@@ -258,7 +258,6 @@ esp_err_t WifiService::start_access_point(const AccessPointConfig &config) {
 
   ap_config = config;
   logging::infof(wifi_tag, "Access point enabled: %s", ap_config.ssid.c_str());
-  start_station_with_saved_profile();
   return ESP_OK;
 }
 
@@ -593,21 +592,6 @@ WifiStatus WifiService::status() const {
   s.sta_last_disconnect_reason = sta_last_disconnect_reason;
   s.sta_last_error = sta_last_error;
   return s;
-}
-
-void WifiService::start_station_with_saved_profile() {
-  if (autoconnect_attempted) {
-    return;
-  }
-
-  const esp_err_t err = start_station();
-  if (err == ESP_ERR_NOT_FOUND) {
-    return;
-  }
-  if (err != ESP_OK) {
-    logging::warnf(wifi_tag, "Auto station connect failed: %s",
-                   esp_err_to_name(err));
-  }
 }
 
 } // namespace earbrain
