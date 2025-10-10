@@ -1,6 +1,7 @@
 #include "earbrain/gateway/middlewares/logging.hpp"
 
 #include "earbrain/gateway/logging.hpp"
+#include "esp_timer.h"
 #include <cstring>
 
 namespace earbrain::middleware {
@@ -30,34 +31,27 @@ const char *http_method_str(int method) {
 
 } // namespace
 
-esp_err_t log_request(httpd_req_t *req) {
+esp_err_t log_request(httpd_req_t *req, NextHandler next) {
   const char *method = http_method_str(req->method);
+  const char *uri = req->uri;
 
-  char query[128] = {0};
-  bool has_query = (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK);
+  // Record start time
+  int64_t start = esp_timer_get_time();
 
-  char body[256] = {0};
-  size_t content_len = req->content_len;
-  if (content_len > 0 && content_len < sizeof(body)) {
-    int ret = httpd_req_recv(req, body, content_len);
-    if (ret <= 0) {
-      body[0] = '\0';
-    } else {
-      body[ret] = '\0';
-    }
-  }
+  // Execute the next handler
+  esp_err_t result = next(req);
 
-  if (has_query && body[0] != '\0') {
-    logging::infof("http", "%s %s?%s body=%s", method, req->uri, query, body);
-  } else if (has_query) {
-    logging::infof("http", "%s %s?%s", method, req->uri, query);
-  } else if (body[0] != '\0') {
-    logging::infof("http", "%s %s body=%s", method, req->uri, body);
-  } else {
-    logging::infof("http", "%s %s", method, req->uri);
-  }
+  // Calculate latency
+  int64_t latency_us = esp_timer_get_time() - start;
+  double latency_ms = latency_us / 1000.0;
 
-  return ESP_OK;
+  // Log request with response info
+  const char *status = (result == ESP_OK) ? "200" : "error";
+
+  logging::infof("http", "%s %s -> %s %.2fms",
+                 method, uri, status, latency_ms);
+
+  return result;
 }
 
 } // namespace earbrain::middleware

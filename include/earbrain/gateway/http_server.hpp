@@ -2,6 +2,7 @@
 
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -9,8 +10,17 @@
 
 namespace earbrain {
 
+class Gateway;
+
+struct RequestContext {
+  Gateway *gateway = nullptr;
+};
+
 using RequestHandler = esp_err_t (*)(httpd_req_t *);
-using Middleware = esp_err_t (*)(httpd_req_t *);
+using NextHandler = std::function<esp_err_t(httpd_req_t *)>;
+using Middleware = std::function<esp_err_t(httpd_req_t *, NextHandler)>;
+
+RequestContext *get_request_context(httpd_req_t *req);
 
 struct RouteOptions {
   std::vector<Middleware> middlewares;

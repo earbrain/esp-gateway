@@ -6,9 +6,14 @@
 #include "freertos/task.h"
 
 // Simple custom middleware that adds a custom header
-static esp_err_t add_custom_header(httpd_req_t *req) {
+static esp_err_t add_custom_header(httpd_req_t *req, earbrain::NextHandler next) {
   httpd_resp_set_hdr(req, "X-Custom", "HelloWorld");
-  return ESP_OK;
+
+  // Call the next handler
+  esp_err_t result = next(req);
+
+  // Can add post-processing here if needed
+  return result;
 }
 
 static esp_err_t custom_hello_handler(httpd_req_t *req) {

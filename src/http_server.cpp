@@ -10,26 +10,38 @@ esp_err_t middleware_wrapper(httpd_req_t *req) {
     return ESP_FAIL;
   }
 
-  // Execute global middlewares
+  // Create request context
+  RequestContext ctx;
+  ctx.gateway = static_cast<Gateway *>(route->user_ctx);
+  req->user_ctx = &ctx;
+
+  // Build the handler chain
+  NextHandler next = [route](httpd_req_t *r) {
+    return route->handler(r);
+  };
+
+  for (auto it = route->middlewares.rbegin(); it != route->middlewares.rend(); ++it) {
+    const Middleware &middleware = *it;
+    NextHandler current_next = next;
+    next = [middleware, current_next](httpd_req_t *r) {
+      return middleware(r, current_next);
+    };
+  }
+
   if (route->server) {
-    for (auto middleware : route->server->get_global_middlewares()) {
-      esp_err_t err = middleware(req);
-      if (err != ESP_OK) {
-        return ESP_OK;
-      }
+    const auto &global_middlewares = route->server->get_global_middlewares();
+    for (auto it = global_middlewares.rbegin(); it != global_middlewares.rend(); ++it) {
+      const Middleware &middleware = *it;
+      NextHandler current_next = next;
+      next = [middleware, current_next](httpd_req_t *r) {
+        return middleware(r, current_next);
+      };
     }
   }
 
-  // Route-specific middlewares
-  for (auto middleware : route->middlewares) {
-    esp_err_t err = middleware(req);
-    if (err != ESP_OK) {
-      return ESP_OK;
-    }
-  }
-
-  req->user_ctx = route->user_ctx;
-  return route->handler(req);
+  // Execute the chain - ctx must stay in scope during this call
+  esp_err_t result = next(req);
+  return result;
 }
 
 } // namespace
@@ -199,6 +211,11 @@ void HttpServer::use(Middleware middleware) {
       route->refresh_descriptor();
     }
   }
+}
+
+// Helper function for request context
+RequestContext *get_request_context(httpd_req_t *req) {
+  return static_cast<RequestContext *>(req->user_ctx);
 }
 
 } // namespace earbrain

@@ -20,6 +20,7 @@ inline esp_err_t send_json_response(httpd_req_t *req, cJSON *json) {
 #if CONFIG_LOG_DEFAULT_LEVEL >= ESP_LOG_DEBUG
   ESP_LOGD("gateway", "response: %s", buffer);
 #endif
+
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
   const esp_err_t err = httpd_resp_send(req, buffer, HTTPD_RESP_USE_STRLEN);
