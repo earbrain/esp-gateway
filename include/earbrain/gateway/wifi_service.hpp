@@ -38,10 +38,6 @@ public:
   esp_err_t start_access_point();
   esp_err_t stop_access_point();
 
-  esp_err_t start_station(const StationConfig &config);
-  esp_err_t start_station();
-  esp_err_t stop_station();
-
   esp_err_t connect(const StationConfig &config);
   esp_err_t connect();
 

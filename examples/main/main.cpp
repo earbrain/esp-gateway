@@ -47,15 +47,10 @@ extern "C" void app_main(void) {
 
   earbrain::logging::infof(TAG, "Gateway version: %s", gateway.version());
 
-  // Try to connect with saved credentials, fallback to AP mode if not available
-  if (gateway.wifi().start_station() != ESP_OK) {
-    earbrain::logging::info("No saved credentials or connection failed, starting AP mode", TAG);
-    if (gateway.wifi().start_access_point() != ESP_OK) {
-      earbrain::logging::error("Failed to start access point", TAG);
-      return;
-    }
-  } else {
-    earbrain::logging::info("Station mode started with saved credentials", TAG);
+  // Start AP mode
+  if (gateway.wifi().start_access_point() != ESP_OK) {
+    earbrain::logging::error("Failed to start access point", TAG);
+    return;
   }
 
   // Start HTTP server
