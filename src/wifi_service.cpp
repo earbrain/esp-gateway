@@ -100,7 +100,7 @@ bool should_retry_reason(wifi_err_reason_t reason) {
 
 WifiService::WifiService()
   : softap_netif(nullptr), sta_netif(nullptr), ap_config{}, sta_config{},
-    initialized(false), handlers_registered(false), sta_connecting(false), sta_connected(false),
+    initialized(false), handlers_registered(false), sta_connected(false),
     sta_retry_count(0), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
     sta_last_error(ESP_OK), credentials_store{} {
@@ -230,7 +230,6 @@ esp_err_t WifiService::start_access_point(const AccessPointConfig &config) {
   }
 
   ap_config = config;
-  sta_connecting = false;
   sta_connected = false;
   sta_retry_count = 0;
   sta_last_error = ESP_OK;
@@ -335,7 +334,6 @@ esp_err_t WifiService::start_station(const StationConfig &config) {
   }
 
   sta_config = config;
-  sta_connecting = true;
   sta_connected = false;
   sta_retry_count = 0;
   sta_last_error = ESP_OK;
@@ -375,7 +373,6 @@ esp_err_t WifiService::stop_station() {
     return err;
   }
 
-  sta_connecting = false;
   sta_connected = false;
   sta_retry_count = 0;
   sta_last_error = ESP_OK;
@@ -419,7 +416,7 @@ esp_err_t WifiService::connect(const StationConfig &config) {
   }
 
   // Disconnect from current STA connection if any
-  if (sta_connected || sta_connecting) {
+  if (sta_connected) {
     esp_err_t disconnect_err = esp_wifi_disconnect();
     if (disconnect_err != ESP_OK && disconnect_err != ESP_ERR_WIFI_NOT_INIT &&
         disconnect_err != ESP_ERR_WIFI_NOT_STARTED &&
@@ -452,7 +449,6 @@ esp_err_t WifiService::connect(const StationConfig &config) {
   }
 
   sta_config = config;
-  sta_connecting = true;
   sta_connected = false;
   sta_retry_count = 0;
   sta_last_error = ESP_OK;
@@ -477,7 +473,7 @@ esp_err_t WifiService::connect(const StationConfig &config) {
     }
 
     // Connection failed with error
-    if (!sta_connecting && sta_last_error != ESP_OK) {
+    if (sta_last_error != ESP_OK) {
       logging::errorf(wifi_tag,
                       "Connection failed: %s (disconnect_reason=%d)",
                       esp_err_to_name(sta_last_error),
@@ -486,8 +482,7 @@ esp_err_t WifiService::connect(const StationConfig &config) {
     }
 
     // Disconnected with a reason (e.g., wrong password)
-    if (!sta_connecting && !sta_connected &&
-        sta_last_disconnect_reason != WIFI_REASON_UNSPECIFIED) {
+    if (!sta_connected && sta_last_disconnect_reason != WIFI_REASON_UNSPECIFIED) {
       logging::errorf(wifi_tag,
                       "Connection failed (disconnect_reason=%d)",
                       static_cast<int>(sta_last_disconnect_reason));
@@ -570,7 +565,6 @@ void WifiService::wifi_event_handler(void *arg, esp_event_base_t event_base,
 }
 
 void WifiService::on_sta_got_ip(const ip_event_got_ip_t &event) {
-  sta_connecting = false;
   sta_connected = true;
   sta_retry_count = 0;
   sta_last_error = ESP_OK;
@@ -584,7 +578,6 @@ void WifiService::on_sta_got_ip(const ip_event_got_ip_t &event) {
 }
 
 void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
-  sta_connecting = false;
   sta_connected = false;
   sta_last_disconnect_reason = static_cast<wifi_err_reason_t>(event.reason);
   sta_ip.addr = 0;
@@ -701,13 +694,11 @@ WifiStatus WifiService::status() const {
   s.sta_active = (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA);
 
   if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
-    s.sta_connecting = sta_connecting;
     s.sta_connected = sta_connected;
     s.sta_ip = sta_ip;
     s.sta_last_disconnect_reason = sta_last_disconnect_reason;
     s.sta_last_error = sta_last_error;
   } else {
-    s.sta_connecting = false;
     s.sta_connected = false;
     s.sta_ip.addr = 0;
     s.sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;

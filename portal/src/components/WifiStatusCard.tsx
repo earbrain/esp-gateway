@@ -40,9 +40,6 @@ export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refre
     if (status.sta_error && status.sta_error.length > 0) {
       return `Connection error: ${status.sta_error}`;
     }
-    if (status.sta_connecting) {
-      return "Connecting to network...";
-    }
     return "Not connected";
   }, [status, statusLoading]);
 
@@ -94,13 +91,6 @@ export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refre
         label: "Error",
         description: `Last error: ${status.sta_error}.`,
         badgeClass: "status-pill bg-rose-100 text-rose-700",
-      };
-    }
-    if (status.sta_connecting) {
-      return {
-        label: "Connecting",
-        description: "Attempting to join the configured network...",
-        badgeClass: "status-pill bg-amber-100 text-amber-700",
       };
     }
     return {

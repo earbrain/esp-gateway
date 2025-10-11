@@ -148,7 +148,6 @@ esp_err_t handle_status_get(httpd_req_t *req) {
   json_model::WifiStatus status;
   status.ap_active = wifi_status.ap_active;
   status.sta_active = wifi_status.sta_active;
-  status.sta_connecting = wifi_status.sta_connecting;
   status.sta_connected = wifi_status.sta_connected;
   status.last_error = wifi_status.sta_last_error;
   status.disconnect_reason = wifi_status.sta_last_disconnect_reason;

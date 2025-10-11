@@ -7,7 +7,6 @@ export type WifiResponse = {
 export type WifiStatus = {
   ap_active: boolean;
   sta_active: boolean;
-  sta_connecting: boolean;
   sta_connected: boolean;
   sta_error: string;
   ip: string;

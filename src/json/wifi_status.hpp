@@ -12,7 +12,6 @@ namespace earbrain::json_model {
 struct WifiStatus {
   bool ap_active = false;
   bool sta_active = false;
-  bool sta_connecting = false;
   bool sta_connected = false;
   std::string ip;
   wifi_err_reason_t disconnect_reason = WIFI_REASON_UNSPECIFIED;
@@ -33,9 +32,6 @@ inline json::Ptr to_json(const WifiStatus &status) {
     return nullptr;
   }
   if (add_bool("sta_active", status.sta_active) != ESP_OK) {
-    return nullptr;
-  }
-  if (add_bool("sta_connecting", status.sta_connecting) != ESP_OK) {
     return nullptr;
   }
   if (add_bool("sta_connected", status.sta_connected) != ESP_OK) {

@@ -23,7 +23,6 @@ struct AccessPointConfig {
 struct WifiStatus {
   bool ap_active = false;
   bool sta_active = false;
-  bool sta_connecting = false;
   bool sta_connected = false;
   esp_ip4_addr_t sta_ip{};
   wifi_err_reason_t sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
@@ -68,7 +67,6 @@ private:
   StationConfig sta_config;
   bool initialized;
   bool handlers_registered;
-  bool sta_connecting;
   bool sta_connected;
   int sta_retry_count;
   esp_ip4_addr_t sta_ip;

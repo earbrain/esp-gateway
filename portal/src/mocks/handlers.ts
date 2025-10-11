@@ -1,7 +1,6 @@
 import { http, HttpResponse, delay } from "msw";
 
 const wifiState = {
-  sta_connecting: false,
   sta_connected: false,
   sta_error: "",
   ip: "",
@@ -79,8 +78,7 @@ export const handlers = [
       status: "success",
       data: {
         ap_active: true,
-        sta_active: wifiState.sta_connected || wifiState.sta_connecting,
-        sta_connecting: wifiState.sta_connecting,
+        sta_active: wifiState.sta_connected,
         sta_connected: wifiState.sta_connected,
         sta_error: wifiState.sta_error,
         ip: wifiState.ip,
@@ -188,7 +186,6 @@ export const handlers = [
     const isSuccess = Math.random() > 0.1;
 
     if (isSuccess) {
-      wifiState.sta_connecting = false;
       wifiState.sta_connected = true;
       wifiState.sta_error = "";
       wifiState.ip = "192.168.1." + Math.floor(Math.random() * 200 + 10);
@@ -202,7 +199,6 @@ export const handlers = [
       });
     } else {
       // Simulate connection failure
-      wifiState.sta_connecting = false;
       wifiState.sta_connected = false;
       wifiState.sta_error = "Authentication failed";
       wifiState.ip = "";
