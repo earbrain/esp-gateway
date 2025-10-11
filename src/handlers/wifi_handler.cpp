@@ -8,6 +8,7 @@
 #include "earbrain/gateway/gateway.hpp"
 #include "earbrain/gateway/handlers/handler_helpers.hpp"
 #include "earbrain/gateway/logging.hpp"
+#include "earbrain/gateway/task_helpers.hpp"
 #include "earbrain/gateway/validation.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
@@ -15,6 +16,8 @@
 #include "json/wifi_status.hpp"
 #include "json/wifi_scan.hpp"
 #include "lwip/ip4_addr.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 namespace earbrain::handlers::wifi {
 
@@ -89,42 +92,35 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
                             esp_err_to_name(result));
   }
 
-  logging::info("Wi-Fi credentials saved. Preparing to start station",
-                "gateway");
+  logging::info("Wi-Fi credentials saved successfully", "gateway");
 
-  const esp_err_t stop_err = gateway->stop_station();
-  if (stop_err != ESP_OK) {
-    logging::warnf("gateway", "Failed to stop existing station: %s",
-                   esp_err_to_name(stop_err));
-  }
+  // Start connection in background task
+  const esp_err_t task_err = tasks::run_detached([gateway, station_cfg]() {
+    // Small delay to ensure HTTP response is sent
+    vTaskDelay(pdMS_TO_TICKS(100));
 
-  const esp_err_t sta_err = gateway->start_station(station_cfg);
-  const bool sta_started = (sta_err == ESP_OK);
-  if (sta_started) {
-    logging::infof("gateway", "Station connection initiated for SSID: %s",
-                   station_cfg.ssid.c_str());
-  } else {
-    logging::errorf("gateway", "Failed to start station: %s",
-                    esp_err_to_name(sta_err));
-  }
-  gateway->wifi().set_autoconnect_attempted(true);
+    logging::infof("gateway", "Starting Wi-Fi connection for SSID: %s", station_cfg.ssid.c_str());
 
-  auto data = json::object();
-  if (!data) {
-    return ESP_ERR_NO_MEM;
-  }
-  if (json::add(data.get(), "restart_required", !sta_started) != ESP_OK) {
-    return ESP_ERR_NO_MEM;
-  }
-  if (json::add(data.get(), "sta_connect_started", sta_started) != ESP_OK) {
-    return ESP_ERR_NO_MEM;
-  }
-  if (!sta_started &&
-      json::add(data.get(), "sta_error", esp_err_to_name(sta_err)) != ESP_OK) {
-    return ESP_ERR_NO_MEM;
+    const esp_err_t stop_err = gateway->stop_station();
+    if (stop_err != ESP_OK) {
+      logging::warnf("gateway", "Failed to stop existing station: %s", esp_err_to_name(stop_err));
+    }
+
+    const esp_err_t sta_err = gateway->start_station(station_cfg);
+    if (sta_err == ESP_OK) {
+      logging::infof("gateway", "Station connection initiated for SSID: %s", station_cfg.ssid.c_str());
+    } else {
+      logging::errorf("gateway", "Failed to start station: %s", esp_err_to_name(sta_err));
+    }
+    gateway->wifi().set_autoconnect_attempted(true);
+  }, "wifi_connect");
+
+  if (task_err != ESP_OK) {
+    logging::error("gateway", "Failed to create Wi-Fi connect task");
+    return http::send_error(req, "Failed to start connection task.", "ESP_FAIL");
   }
 
-  return http::send_success(req, std::move(data));
+  return http::send_success(req);
 }
 
 esp_err_t handle_status_get(httpd_req_t *req) {
