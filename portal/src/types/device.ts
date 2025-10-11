@@ -9,7 +9,6 @@ export type HealthStatus = {
   status: string;
   uptime: number;
   version: string;
-  connection_type: "ap" | "sta" | "apsta" | "unknown";
 };
 
 export type Metrics = {

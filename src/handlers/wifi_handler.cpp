@@ -1,5 +1,7 @@
 #include "earbrain/gateway/handlers/wifi_handler.hpp"
 
+#include "esp_wifi.h"
+
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -8,7 +10,6 @@
 #include "earbrain/gateway/gateway.hpp"
 #include "earbrain/gateway/handlers/handler_helpers.hpp"
 #include "earbrain/gateway/logging.hpp"
-#include "earbrain/gateway/task_helpers.hpp"
 #include "earbrain/gateway/validation.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
@@ -84,7 +85,7 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
                  station_cfg.ssid.c_str(), station_cfg.ssid.size());
 
   const esp_err_t result =
-      gateway->save_wifi_credentials(station_cfg.ssid, station_cfg.passphrase);
+      gateway->wifi().credentials().save(station_cfg.ssid, station_cfg.passphrase);
   if (result != ESP_OK) {
     logging::errorf("gateway", "Failed to save Wi-Fi credentials: %s",
                     esp_err_to_name(result));
@@ -93,34 +94,47 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
   }
 
   logging::info("Wi-Fi credentials saved successfully", "gateway");
+  return http::send_success(req);
+}
 
-  // Start connection in background task
-  const esp_err_t task_err = tasks::run_detached([gateway, station_cfg]() {
-    // Small delay to ensure HTTP response is sent
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    logging::infof("gateway", "Starting Wi-Fi connection for SSID: %s", station_cfg.ssid.c_str());
-
-    const esp_err_t stop_err = gateway->wifi().stop_station();
-    if (stop_err != ESP_OK) {
-      logging::warnf("gateway", "Failed to stop existing station: %s", esp_err_to_name(stop_err));
-    }
-
-    const esp_err_t sta_err = gateway->wifi().start_station(station_cfg);
-    if (sta_err == ESP_OK) {
-      logging::infof("gateway", "Station connection initiated for SSID: %s", station_cfg.ssid.c_str());
-    } else {
-      logging::errorf("gateway", "Failed to start station: %s", esp_err_to_name(sta_err));
-    }
-    gateway->wifi().set_autoconnect_attempted(true);
-  }, "wifi_connect");
-
-  if (task_err != ESP_OK) {
-    logging::error("gateway", "Failed to create Wi-Fi connect task");
-    return http::send_error(req, "Failed to start connection task.", "ESP_FAIL");
+esp_err_t handle_connect_post(httpd_req_t *req) {
+  auto *gateway = handlers::get_gateway(req);
+  if (!gateway) {
+    return ESP_FAIL;
   }
 
-  return http::send_success(req);
+  logging::info("Attempting to connect using saved credentials", "gateway");
+
+  const esp_err_t result = gateway->wifi().connect();
+  if (result == ESP_OK) {
+    logging::info("Successfully connected to saved network", "gateway");
+    return http::send_success(req);
+  }
+
+  // Map error codes to user-friendly messages
+  const char* error_msg = "Connection failed";
+  switch (result) {
+    case ESP_ERR_NOT_FOUND:
+      error_msg = "No saved credentials found";
+      break;
+    case ESP_ERR_WIFI_PASSWORD:
+      error_msg = "Authentication failed (wrong password?)";
+      break;
+    case ESP_ERR_WIFI_SSID:
+      error_msg = "Network not found";
+      break;
+    case ESP_ERR_TIMEOUT:
+      error_msg = "Connection timeout";
+      break;
+    case ESP_ERR_INVALID_STATE:
+      error_msg = "WiFi not in correct mode (APSTA required)";
+      break;
+    default:
+      break;
+  }
+
+  logging::errorf("gateway", "Connection failed: %s", esp_err_to_name(result));
+  return http::send_error(req, error_msg, esp_err_to_name(result));
 }
 
 esp_err_t handle_status_get(httpd_req_t *req) {
@@ -138,7 +152,6 @@ esp_err_t handle_status_get(httpd_req_t *req) {
   status.sta_connected = wifi_status.sta_connected;
   status.last_error = wifi_status.sta_last_error;
   status.disconnect_reason = wifi_status.sta_last_disconnect_reason;
-  status.connection_type = handlers::get_connection_type(req, gateway);
 
   const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&wifi_status.sta_ip);
   char ip_buffer[16] = {0};

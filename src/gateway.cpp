@@ -31,40 +31,13 @@ Gateway::Gateway()
 }
 
 Gateway::Gateway(const GatewayOptions &opts)
-  : options{opts}, wifi_service{}, http_server{}, mdns_service{},
+  : options{opts}, wifi_service{}, http_server{}, mdns_service{opts.mdns_config},
     builtin_routes_registered(false) {
 }
 
 Gateway::~Gateway() {
   http_server.stop();
   mdns_service.stop();
-}
-
-esp_err_t Gateway::start() {
-  logging::info("Starting gateway", gateway_tag);
-
-  esp_err_t err = wifi_service.start(options.ap_config);
-  if (err != ESP_OK) {
-    return err;
-  }
-
-  logging::info("Starting HTTP server", gateway_tag);
-  ensure_builtin_routes();
-  err = http_server.start();
-  if (err != ESP_OK) {
-    logging::errorf(gateway_tag, "Failed to start HTTP server: %s", esp_err_to_name(err));
-    return err;
-  }
-
-  logging::info("Starting mDNS service", gateway_tag);
-  err = mdns_service.start(options.mdns_config);
-  if (err != ESP_OK) {
-    // mDNS failure is not critical
-    logging::warnf(gateway_tag, "Failed to start mDNS: %s", esp_err_to_name(err));
-  }
-
-  logging::info("Gateway started successfully", gateway_tag);
-  return ESP_OK;
 }
 
 esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
@@ -113,6 +86,7 @@ void Gateway::ensure_builtin_routes() {
       {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
       {"/api/v1/metrics", HTTP_GET, &handlers::metrics::handle_get},
       {"/api/v1/wifi/credentials", HTTP_POST, &handlers::wifi::handle_credentials_post},
+      {"/api/v1/wifi/connect", HTTP_POST, &handlers::wifi::handle_connect_post},
       {"/api/v1/wifi/status", HTTP_GET, &handlers::wifi::handle_status_get},
       {"/api/v1/wifi/scan", HTTP_GET, &handlers::wifi::handle_scan_get},
       {"/api/v1/mdns", HTTP_GET, &handlers::mdns::handle_get},
@@ -129,15 +103,6 @@ void Gateway::ensure_builtin_routes() {
                      esp_err_to_name(err));
     }
   }
-}
-
-esp_err_t Gateway::save_wifi_credentials(std::string_view ssid,
-                                         std::string_view passphrase) {
-  esp_err_t err = wifi_service.credentials().save(ssid, passphrase);
-  if (err == ESP_OK) {
-    wifi_service.set_autoconnect_attempted(false);
-  }
-  return err;
 }
 
 } // namespace earbrain

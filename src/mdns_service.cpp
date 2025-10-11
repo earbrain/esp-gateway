@@ -92,6 +92,10 @@ esp_err_t MdnsService::start(const MdnsConfig &config) {
   return ESP_OK;
 }
 
+esp_err_t MdnsService::start() {
+  return start(config_);
+}
+
 esp_err_t MdnsService::stop() {
   if (!initialized) {
     running = false;

@@ -10,7 +10,11 @@ const Spinner = () => (
   ></span>
 );
 
-export const WifiStatusCard: FunctionalComponent = () => {
+type WifiStatusCardProps = {
+  refresh?: number;
+};
+
+export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refresh }) => {
   const {
     data: status,
     loading: statusLoading,
@@ -21,7 +25,7 @@ export const WifiStatusCard: FunctionalComponent = () => {
 
   useEffect(() => {
     fetchStatus();
-  }, []);
+  }, [refresh]);
 
   const statusSummary = useMemo(() => {
     if (!status) {

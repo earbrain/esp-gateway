@@ -100,11 +100,10 @@ bool should_retry_reason(wifi_err_reason_t reason) {
 
 WifiService::WifiService()
   : softap_netif(nullptr), sta_netif(nullptr), ap_config{}, sta_config{},
-    initialized(false), started(false), ap_active(false), sta_active(false),
-    handlers_registered(false), sta_connecting(false), sta_connected(false),
+    initialized(false), handlers_registered(false), sta_connecting(false), sta_connected(false),
     sta_retry_count(0), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
-    sta_last_error(ESP_OK), autoconnect_attempted(false), credentials_store{} {
+    sta_last_error(ESP_OK), credentials_store{} {
 }
 
 esp_err_t WifiService::ensure_initialized() {
@@ -191,48 +190,6 @@ esp_err_t WifiService::register_event_handlers() {
   return ESP_OK;
 }
 
-esp_err_t WifiService::apply_mode() {
-  if (!initialized) {
-    return ESP_ERR_WIFI_NOT_INIT;
-  }
-
-  wifi_mode_t mode = WIFI_MODE_NULL;
-  if (ap_active && sta_active) {
-    mode = WIFI_MODE_APSTA;
-  } else if (ap_active) {
-    mode = WIFI_MODE_AP;
-  } else if (sta_active) {
-    mode = WIFI_MODE_STA;
-  }
-
-  if (mode == WIFI_MODE_NULL) {
-    if (started) {
-      esp_err_t err = esp_wifi_stop();
-      if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_INIT &&
-          err != ESP_ERR_WIFI_NOT_STARTED) {
-        return err;
-      }
-      started = false;
-    }
-    return esp_wifi_set_mode(WIFI_MODE_NULL);
-  }
-
-  esp_err_t err = esp_wifi_set_mode(mode);
-  if (err != ESP_OK) {
-    return err;
-  }
-
-  if (!started) {
-    err = esp_wifi_start();
-    if (err != ESP_OK) {
-      return err;
-    }
-    started = true;
-  }
-
-  return ESP_OK;
-}
-
 esp_err_t WifiService::start_access_point(const AccessPointConfig &config) {
   if (!validation::is_valid_ssid(config.ssid)) {
     return ESP_ERR_INVALID_ARG;
@@ -243,26 +200,43 @@ esp_err_t WifiService::start_access_point(const AccessPointConfig &config) {
     return err;
   }
 
+  esp_err_t stop_err = esp_wifi_stop();
+  if (stop_err != ESP_OK && stop_err != ESP_ERR_WIFI_NOT_STARTED &&
+      stop_err != ESP_ERR_WIFI_NOT_INIT) {
+    logging::warnf(wifi_tag, "Failed to stop Wi-Fi before starting AP: %s",
+                   esp_err_to_name(stop_err));
+    return stop_err;
+  }
+
   wifi_config_t ap_cfg = make_ap_config(config);
 
-  const bool previous_state = ap_active;
-  ap_active = true;
-
-  err = apply_mode();
+  err = esp_wifi_set_mode(WIFI_MODE_APSTA);
   if (err != ESP_OK) {
-    ap_active = previous_state;
     return err;
   }
 
   err = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
   if (err != ESP_OK) {
-    ap_active = previous_state;
-    apply_mode();
+    logging::warnf(wifi_tag, "Failed to configure AP interface: %s",
+                   esp_err_to_name(err));
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+    return err;
+  }
+
+  err = esp_wifi_start();
+  if (err != ESP_OK) {
+    esp_wifi_set_mode(WIFI_MODE_NULL);
     return err;
   }
 
   ap_config = config;
-  logging::infof(wifi_tag, "Access point enabled: %s", ap_config.ssid.c_str());
+  sta_connecting = false;
+  sta_connected = false;
+  sta_retry_count = 0;
+  sta_last_error = ESP_OK;
+  sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
+  sta_ip.addr = 0;
+  logging::infof(wifi_tag, "Access point started (APSTA mode): %s", ap_config.ssid.c_str());
   return ESP_OK;
 }
 
@@ -271,17 +245,13 @@ esp_err_t WifiService::start_access_point() {
 }
 
 esp_err_t WifiService::stop_access_point() {
-  if (!ap_active) {
-    return ESP_OK;
-  }
-
-  ap_active = false;
-  esp_err_t err = apply_mode();
-  if (err != ESP_OK) {
-    ap_active = true;
+  esp_err_t err = esp_wifi_stop();
+  if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED &&
+      err != ESP_ERR_WIFI_NOT_INIT) {
     return err;
   }
 
+  esp_wifi_set_mode(WIFI_MODE_NULL);
   logging::info("Access point stopped", wifi_tag);
   return ESP_OK;
 }
@@ -299,15 +269,32 @@ esp_err_t WifiService::start_station(const StationConfig &config) {
     return err;
   }
 
-  const bool previous_state = sta_active;
-  sta_active = true;
+  // Save current mode for potential rollback
+  wifi_mode_t previous_mode = WIFI_MODE_NULL;
+  if (esp_wifi_get_mode(&previous_mode) != ESP_OK) {
+    previous_mode = WIFI_MODE_NULL;
+  }
 
-  err = apply_mode();
+  // Helper lambda for rollback on failure
+  auto rollback_on_failure = [&](esp_err_t error) -> esp_err_t {
+    if (previous_mode == WIFI_MODE_APSTA) {
+      logging::info("Restoring AP mode (APSTA) after STA mode switch failure", wifi_tag);
+      start_access_point(ap_config);
+    }
+    return error;
+  };
+
+  esp_err_t stop_err = esp_wifi_stop();
+  if (stop_err != ESP_OK && stop_err != ESP_ERR_WIFI_NOT_STARTED &&
+      stop_err != ESP_ERR_WIFI_NOT_INIT) {
+    sta_last_error = stop_err;
+    return stop_err;
+  }
+
+  err = esp_wifi_set_mode(WIFI_MODE_STA);
   if (err != ESP_OK) {
     sta_last_error = err;
-    sta_active = previous_state;
-    apply_mode();
-    return err;
+    return rollback_on_failure(err);
   }
 
   wifi_config_t sta_cfg = make_sta_config(config);
@@ -315,9 +302,15 @@ esp_err_t WifiService::start_station(const StationConfig &config) {
   err = esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
   if (err != ESP_OK) {
     sta_last_error = err;
-    sta_active = previous_state;
-    apply_mode();
-    return err;
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+    return rollback_on_failure(err);
+  }
+
+  err = esp_wifi_start();
+  if (err != ESP_OK) {
+    sta_last_error = err;
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+    return rollback_on_failure(err);
   }
 
   esp_err_t ps_err = esp_wifi_set_ps(WIFI_PS_NONE);
@@ -335,9 +328,10 @@ esp_err_t WifiService::start_station(const StationConfig &config) {
   err = esp_wifi_connect();
   if (err != ESP_OK && err != ESP_ERR_WIFI_CONN) {
     sta_last_error = err;
-    sta_active = previous_state;
-    apply_mode();
-    return err;
+    esp_wifi_disconnect();
+    esp_wifi_stop();
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+    return rollback_on_failure(err);
   }
 
   sta_config = config;
@@ -353,101 +347,30 @@ esp_err_t WifiService::start_station(const StationConfig &config) {
 }
 
 esp_err_t WifiService::start_station() {
-  const esp_err_t init_err = ensure_initialized();
-  if (init_err != ESP_OK) {
-    return init_err;
+  esp_err_t err = ensure_initialized();
+  if (err != ESP_OK) {
+    sta_last_error = err;
+    return err;
   }
 
-  auto credentials = credentials_store.get();
-  if (!credentials) {
+  auto saved_credentials = credentials_store.get();
+  if (!saved_credentials.has_value()) {
+    sta_last_error = ESP_ERR_NOT_FOUND;
+    logging::warn("No saved credentials found", wifi_tag);
     return ESP_ERR_NOT_FOUND;
   }
-
-  logging::infof(wifi_tag,
-                 "Attempting auto-connect to saved SSID: '%s' (len=%zu)",
-                 credentials->ssid.c_str(), credentials->ssid.size());
-
-  autoconnect_attempted = true;
-
-  return start_station(*credentials);
-}
-
-esp_err_t WifiService::start(const AccessPointConfig &ap_config) {
-  // Try to start in STA mode with saved credentials
-  esp_err_t sta_err = start_station();
-
-  if (sta_err == ESP_ERR_NOT_FOUND) {
-    logging::info("No saved credentials found, starting in AP mode", wifi_tag);
-    return start_access_point(ap_config);
-  }
-
-  if (sta_err != ESP_OK) {
-    logging::warnf(wifi_tag, "Failed to start STA mode: %s, falling back to AP mode",
-                   esp_err_to_name(sta_err));
-    return start_access_point(ap_config);
-  }
-
-  auto credentials = credentials_store.get();
-  if (credentials) {
-    logging::infof(wifi_tag, "Connecting to SSID: '%s'", credentials->ssid.c_str());
-  }
-
-  logging::info("Waiting for STA connection...", wifi_tag);
-
-  // Poll connection status until success, failure, or timeout
-  uint32_t elapsed_ms = 0;
-  while (elapsed_ms < sta_connection_timeout_ms) {
-    esp_task_wdt_reset();
-
-    vTaskDelay(pdMS_TO_TICKS(sta_connection_check_interval_ms));
-    elapsed_ms += sta_connection_check_interval_ms;
-
-    WifiStatus wifi_status = status();
-
-    if (wifi_status.sta_connected) {
-      logging::info("Successfully connected to WiFi in STA mode", wifi_tag);
-      return ESP_OK;
-    }
-
-    if (!wifi_status.sta_connecting && wifi_status.sta_last_error != ESP_OK) {
-      logging::warnf(wifi_tag, "STA connection failed: %s",
-                     esp_err_to_name(wifi_status.sta_last_error));
-      break;
-    }
-  }
-
-  if (elapsed_ms >= sta_connection_timeout_ms) {
-    logging::warn("STA connection timeout", wifi_tag);
-  }
-
-  esp_err_t stop_err = stop_station();
-  if (stop_err != ESP_OK) {
-    logging::warnf(wifi_tag, "Failed to stop STA mode: %s",
-                   esp_err_to_name(stop_err));
-  }
-
-  logging::info("Falling back to AP mode", wifi_tag);
-  return start_access_point(ap_config);
+  return start_station(saved_credentials.value());
 }
 
 esp_err_t WifiService::stop_station() {
-  if (!sta_active) {
-    return ESP_OK;
+  wifi_mode_t current_mode = WIFI_MODE_NULL;
+  if (esp_wifi_get_mode(&current_mode) != ESP_OK) {
+    current_mode = WIFI_MODE_NULL;
   }
 
   esp_err_t err = esp_wifi_disconnect();
   if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_INIT &&
       err != ESP_ERR_WIFI_NOT_STARTED && err != ESP_ERR_WIFI_NOT_CONNECT) {
-    sta_last_error = err;
-    return err;
-  }
-
-  const bool previous_state = sta_active;
-  sta_active = false;
-
-  err = apply_mode();
-  if (err != ESP_OK) {
-    sta_active = previous_state;
     sta_last_error = err;
     return err;
   }
@@ -458,12 +381,161 @@ esp_err_t WifiService::stop_station() {
   sta_last_error = ESP_OK;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
   sta_ip.addr = 0;
+
+  if (current_mode == WIFI_MODE_STA) {
+    err = esp_wifi_stop();
+    if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED &&
+        err != ESP_ERR_WIFI_NOT_INIT) {
+      sta_last_error = err;
+      return err;
+    }
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+  }
+
   logging::info("Station stopped", wifi_tag);
   return ESP_OK;
 }
 
+esp_err_t WifiService::connect(const StationConfig &config) {
+  esp_err_t err = ensure_initialized();
+  if (err != ESP_OK) {
+    sta_last_error = err;
+    return err;
+  }
+
+  // Check current WiFi mode
+  wifi_mode_t current_mode = WIFI_MODE_NULL;
+  err = esp_wifi_get_mode(&current_mode);
+  if (err != ESP_OK) {
+    sta_last_error = err;
+    return err;
+  }
+
+  // Only works in APSTA mode
+  if (current_mode != WIFI_MODE_APSTA) {
+    logging::warn("connect() requires APSTA mode", wifi_tag);
+    sta_last_error = ESP_ERR_INVALID_STATE;
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  // Disconnect from current STA connection if any
+  if (sta_connected || sta_connecting) {
+    esp_err_t disconnect_err = esp_wifi_disconnect();
+    if (disconnect_err != ESP_OK && disconnect_err != ESP_ERR_WIFI_NOT_INIT &&
+        disconnect_err != ESP_ERR_WIFI_NOT_STARTED &&
+        disconnect_err != ESP_ERR_WIFI_NOT_CONNECT) {
+      logging::warnf(wifi_tag, "Failed to disconnect before reconnect: %s",
+                     esp_err_to_name(disconnect_err));
+    }
+
+    // Wait for disconnect to complete
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+
+  // Configure STA interface
+  wifi_config_t sta_cfg = make_sta_config(config);
+  err = esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
+  if (err != ESP_OK) {
+    sta_last_error = err;
+    logging::errorf(wifi_tag, "Failed to configure STA interface: %s",
+                    esp_err_to_name(err));
+    return err;
+  }
+
+  // Attempt to connect
+  err = esp_wifi_connect();
+  if (err != ESP_OK && err != ESP_ERR_WIFI_CONN) {
+    sta_last_error = err;
+    logging::errorf(wifi_tag, "Failed to initiate connection: %s",
+                    esp_err_to_name(err));
+    return err;
+  }
+
+  sta_config = config;
+  sta_connecting = true;
+  sta_connected = false;
+  sta_retry_count = 0;
+  sta_last_error = ESP_OK;
+  sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
+  sta_ip.addr = 0;
+  logging::infof(wifi_tag, "Station connection initiated (APSTA mode): ssid='%s', passphrase_len=%zu",
+                 sta_config.ssid.c_str(), sta_config.passphrase.size());
+
+  // Wait for connection result
+  constexpr uint32_t timeout_ms = 15000;
+  constexpr uint32_t check_interval_ms = 500;
+  uint32_t elapsed_ms = 0;
+
+  while (elapsed_ms < timeout_ms) {
+    vTaskDelay(pdMS_TO_TICKS(check_interval_ms));
+    elapsed_ms += check_interval_ms;
+
+    // Connection successful
+    if (sta_connected) {
+      logging::infof(wifi_tag, "Successfully connected to SSID: %s", sta_config.ssid.c_str());
+      return ESP_OK;
+    }
+
+    // Connection failed with error
+    if (!sta_connecting && sta_last_error != ESP_OK) {
+      logging::errorf(wifi_tag,
+                      "Connection failed: %s (disconnect_reason=%d)",
+                      esp_err_to_name(sta_last_error),
+                      static_cast<int>(sta_last_disconnect_reason));
+      return sta_last_error;
+    }
+
+    // Disconnected with a reason (e.g., wrong password)
+    if (!sta_connecting && !sta_connected &&
+        sta_last_disconnect_reason != WIFI_REASON_UNSPECIFIED) {
+      logging::errorf(wifi_tag,
+                      "Connection failed (disconnect_reason=%d)",
+                      static_cast<int>(sta_last_disconnect_reason));
+
+      // Map disconnect reason to error code
+      switch (sta_last_disconnect_reason) {
+        case WIFI_REASON_AUTH_EXPIRE:
+        case WIFI_REASON_AUTH_FAIL:
+        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        case WIFI_REASON_HANDSHAKE_TIMEOUT:
+          sta_last_error = ESP_ERR_WIFI_PASSWORD;
+          break;
+        case WIFI_REASON_NO_AP_FOUND:
+          sta_last_error = ESP_ERR_WIFI_SSID;
+          break;
+        default:
+          sta_last_error = ESP_FAIL;
+          break;
+      }
+      return sta_last_error;
+    }
+  }
+
+  // Timeout
+  logging::warn("Connection attempt timed out", wifi_tag);
+  sta_last_error = ESP_ERR_TIMEOUT;
+  return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t WifiService::connect() {
+  esp_err_t err = ensure_initialized();
+  if (err != ESP_OK) {
+    sta_last_error = err;
+    return err;
+  }
+
+  auto saved_credentials = credentials_store.get();
+  if (!saved_credentials.has_value()) {
+    sta_last_error = ESP_ERR_NOT_FOUND;
+    logging::warn("No saved credentials found", wifi_tag);
+    return ESP_ERR_NOT_FOUND;
+  }
+
+  return connect(saved_credentials.value());
+}
+
 void WifiService::ip_event_handler(void *arg, esp_event_base_t event_base,
-                            int32_t event_id, void *event_data) {
+                                   int32_t event_id, void *event_data) {
   if (event_base != IP_EVENT || event_id != IP_EVENT_STA_GOT_IP || !event_data) {
     return;
   }
@@ -476,7 +548,7 @@ void WifiService::ip_event_handler(void *arg, esp_event_base_t event_base,
 }
 
 void WifiService::wifi_event_handler(void *arg, esp_event_base_t event_base,
-                              int32_t event_id, void *event_data) {
+                                     int32_t event_id, void *event_data) {
   if (event_base != WIFI_EVENT) {
     return;
   }
@@ -520,7 +592,11 @@ void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event
                  static_cast<int>(event.reason));
 
   const wifi_err_reason_t reason = static_cast<wifi_err_reason_t>(event.reason);
-  if (sta_active && should_retry_reason(reason) &&
+  wifi_mode_t mode = WIFI_MODE_NULL;
+  if (esp_wifi_get_mode(&mode) != ESP_OK) {
+    mode = WIFI_MODE_NULL;
+  }
+  if (mode == WIFI_MODE_STA && should_retry_reason(reason) &&
       sta_retry_count < sta_max_connect_retries) {
     ++sta_retry_count;
     const esp_err_t err = esp_wifi_connect();
@@ -540,50 +616,26 @@ void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event
 WifiScanResult WifiService::perform_scan() {
   WifiScanResult result{};
 
-  esp_err_t err = ensure_initialized();
-  if (err != ESP_OK) {
-    result.error = err;
+  // WiFi must be started before scanning
+  wifi_mode_t current_mode = WIFI_MODE_NULL;
+  esp_err_t err = esp_wifi_get_mode(&current_mode);
+  if (err != ESP_OK || current_mode == WIFI_MODE_NULL) {
+    result.error = ESP_ERR_INVALID_STATE;
+    logging::warn("Cannot scan: WiFi not started", wifi_tag);
     return result;
   }
 
-  const bool previous_sta_active = sta_active;
-  if (!sta_active) {
-    sta_active = true;
-  }
-
-  err = apply_mode();
-  if (err != ESP_OK) {
-    if (!previous_sta_active) {
-      sta_active = false;
-      esp_err_t mode_err = apply_mode();
-      if (mode_err != ESP_OK) {
-        logging::warnf(wifi_tag,
-                       "Failed to restore AP-only mode after scan setup: %s",
-                       esp_err_to_name(mode_err));
-      }
-    }
-    result.error = err;
-    return result;
-  }
-
+  // Start scan
   wifi_scan_config_t scan_cfg{};
   scan_cfg.show_hidden = true;
 
   err = esp_wifi_scan_start(&scan_cfg, true);
   if (err != ESP_OK) {
-    if (!previous_sta_active) {
-      sta_active = false;
-      esp_err_t mode_err = apply_mode();
-      if (mode_err != ESP_OK) {
-        logging::warnf(wifi_tag,
-                       "Failed to restore AP-only mode after scan failure: %s",
-                       esp_err_to_name(mode_err));
-      }
-    }
     result.error = err;
     return result;
   }
 
+  // Get scan results
   uint16_t ap_count = 0;
   err = esp_wifi_scan_get_ap_num(&ap_count);
   std::vector<wifi_ap_record_t> records;
@@ -597,25 +649,13 @@ WifiScanResult WifiService::perform_scan() {
     }
   }
 
-  if (!previous_sta_active) {
-    sta_active = false;
-    esp_err_t mode_err = apply_mode();
-    if (mode_err != ESP_OK) {
-      logging::warnf(wifi_tag,
-                     "Failed to restore AP-only mode after scan: %s",
-                     esp_err_to_name(mode_err));
-    }
-  }
-
   if (err != ESP_OK) {
     result.error = err;
     return result;
   }
 
+  // Build network list
   result.networks.reserve(records.size());
-  const bool is_connected = sta_connected;
-  const std::string current_ssid =
-      is_connected ? sta_config.ssid : std::string{};
 
   for (const auto &record : records) {
     const char *ssid_raw = reinterpret_cast<const char *>(record.ssid);
@@ -631,11 +671,17 @@ WifiScanResult WifiService::perform_scan() {
     summary.channel = record.primary;
     summary.auth_mode = record.authmode;
     summary.hidden = record.ssid[0] == '\0';
-    summary.connected = is_connected && !current_ssid.empty() &&
-                        current_ssid == summary.ssid;
+
+    // Only check for connected network if actually connected
+    summary.connected = false;
+    if (sta_connected && !sta_config.ssid.empty()) {
+      summary.connected = (sta_config.ssid == summary.ssid);
+    }
+
     result.networks.push_back(std::move(summary));
   }
 
+  // Sort by signal strength
   std::sort(result.networks.begin(), result.networks.end(),
             [](const WifiNetworkSummary &a, const WifiNetworkSummary &b) {
               return a.signal > b.signal;
@@ -647,13 +693,27 @@ WifiScanResult WifiService::perform_scan() {
 
 WifiStatus WifiService::status() const {
   WifiStatus s;
-  s.ap_active = ap_active;
-  s.sta_active = sta_active;
-  s.sta_connecting = sta_connecting;
-  s.sta_connected = sta_connected;
-  s.sta_ip = sta_ip;
-  s.sta_last_disconnect_reason = sta_last_disconnect_reason;
-  s.sta_last_error = sta_last_error;
+  wifi_mode_t mode = WIFI_MODE_NULL;
+  if (esp_wifi_get_mode(&mode) != ESP_OK) {
+    mode = WIFI_MODE_NULL;
+  }
+  s.ap_active = (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA);
+  s.sta_active = (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA);
+
+  if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
+    s.sta_connecting = sta_connecting;
+    s.sta_connected = sta_connected;
+    s.sta_ip = sta_ip;
+    s.sta_last_disconnect_reason = sta_last_disconnect_reason;
+    s.sta_last_error = sta_last_error;
+  } else {
+    s.sta_connecting = false;
+    s.sta_connected = false;
+    s.sta_ip.addr = 0;
+    s.sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
+    s.sta_last_error = ESP_OK;
+  }
+
   return s;
 }
 

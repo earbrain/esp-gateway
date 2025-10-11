@@ -35,28 +35,25 @@ public:
   WifiService();
   ~WifiService() = default;
 
-  esp_err_t start(const AccessPointConfig &ap_config);
-
-  esp_err_t start_access_point();
   esp_err_t start_access_point(const AccessPointConfig &config);
+  esp_err_t start_access_point();
   esp_err_t stop_access_point();
 
-  esp_err_t start_station();
   esp_err_t start_station(const StationConfig &config);
+  esp_err_t start_station();
   esp_err_t stop_station();
+
+  esp_err_t connect(const StationConfig &config);
+  esp_err_t connect();
 
   WifiScanResult perform_scan();
   WifiStatus status() const;
 
   WifiCredentialStore &credentials() { return credentials_store; }
 
-  void set_autoconnect_attempted(bool value) { autoconnect_attempted = value; }
-  bool is_autoconnect_attempted() const { return autoconnect_attempted; }
-
 private:
   esp_err_t ensure_initialized();
   esp_err_t register_event_handlers();
-  esp_err_t apply_mode();
 
   static void ip_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data);
@@ -70,9 +67,6 @@ private:
   AccessPointConfig ap_config;
   StationConfig sta_config;
   bool initialized;
-  bool started;
-  bool ap_active;
-  bool sta_active;
   bool handlers_registered;
   bool sta_connecting;
   bool sta_connected;
@@ -80,7 +74,6 @@ private:
   esp_ip4_addr_t sta_ip;
   wifi_err_reason_t sta_last_disconnect_reason;
   esp_err_t sta_last_error;
-  bool autoconnect_attempted;
   WifiCredentialStore credentials_store;
 };
 

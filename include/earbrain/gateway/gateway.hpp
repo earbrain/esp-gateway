@@ -21,13 +21,12 @@ public:
   Gateway(const GatewayOptions &options);
   ~Gateway();
 
-  esp_err_t start();
-
-  esp_err_t save_wifi_credentials(std::string_view ssid, std::string_view passphrase);
-
   WifiService &wifi() { return wifi_service; }
   MdnsService &mdns() { return mdns_service; }
-  HttpServer &server() { return http_server; }
+  HttpServer &server() {
+    ensure_builtin_routes();
+    return http_server;
+  }
 
   esp_err_t add_route(std::string_view uri, httpd_method_t method,
                       RequestHandler handler, void *user_ctx = nullptr);

@@ -2,7 +2,6 @@ import Router, { route, type RouterOnChangeArgs } from "preact-router";
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
-import { ConnectionBadge } from "./components/ConnectionBadge";
 import { useHealth } from "./hooks/useHealth";
 import { HomePage } from "./pages/home";
 import { DeviceInfoPage } from "./pages/device/info";
@@ -129,7 +128,6 @@ export function App() {
         <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-4">
           <h1 class="text-xl font-semibold text-slate-900">ESP Gateway</h1>
           <div class="flex items-center gap-3">
-            {health && <ConnectionBadge type={health.connection_type} />}
             <nav class="relative" ref={menuRef}>
               <button
                 type="button"

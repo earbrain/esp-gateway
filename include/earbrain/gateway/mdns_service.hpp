@@ -16,8 +16,10 @@ struct MdnsConfig {
 class MdnsService {
 public:
   MdnsService() = default;
+  MdnsService(const MdnsConfig &config) : config_(config) {}
 
   esp_err_t start(const MdnsConfig &config);
+  esp_err_t start();
   esp_err_t stop();
 
   bool is_running() const noexcept { return running; }

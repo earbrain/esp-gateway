@@ -47,10 +47,26 @@ extern "C" void app_main(void) {
 
   earbrain::logging::infof(TAG, "Gateway version: %s", gateway.version());
 
-  // Start the gateway
-  if (gateway.start() != ESP_OK) {
-    earbrain::logging::error("Failed to start gateway", TAG);
+  // Try to connect with saved credentials, fallback to AP mode if not available
+  if (gateway.wifi().start_station() != ESP_OK) {
+    earbrain::logging::info("No saved credentials or connection failed, starting AP mode", TAG);
+    if (gateway.wifi().start_access_point() != ESP_OK) {
+      earbrain::logging::error("Failed to start access point", TAG);
+      return;
+    }
+  } else {
+    earbrain::logging::info("Station mode started with saved credentials", TAG);
+  }
+
+  // Start HTTP server
+  if (gateway.server().start() != ESP_OK) {
+    earbrain::logging::error("Failed to start HTTP server", TAG);
     return;
+  }
+
+  // Start mDNS service
+  if (gateway.mdns().start() != ESP_OK) {
+    earbrain::logging::warn("Failed to start mDNS service", TAG);
   }
 
   while (true) {

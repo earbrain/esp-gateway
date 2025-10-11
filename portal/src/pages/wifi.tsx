@@ -10,9 +10,14 @@ type WifiPageProps = {
 
 export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [statusRefresh, setStatusRefresh] = useState(0);
 
   const handleError = useCallback((message: string) => {
     setToast({ type: "error", message });
+  }, []);
+
+  const handleConnectionComplete = useCallback(() => {
+    setStatusRefresh((prev) => prev + 1);
   }, []);
 
   return (
@@ -27,8 +32,8 @@ export const WifiPage: FunctionalComponent<WifiPageProps> = () => {
         </div>
       )}
       <section class="space-y-6">
-        <WifiStatusCard />
-        <WifiNetworkList onError={handleError} />
+        <WifiStatusCard refresh={statusRefresh} />
+        <WifiNetworkList onError={handleError} onConnectionComplete={handleConnectionComplete} />
       </section>
     </>
   );

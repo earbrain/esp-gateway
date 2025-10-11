@@ -14,20 +14,12 @@ export const handlers = [
   http.get("/health", async () => {
     await delay(50);
 
-    // Determine connection type
-    let connectionType: "ap" | "sta" | "apsta" = "ap";
-    if (wifiState.sta_connected) {
-      // If STA is connected, show "apsta" to simulate dual mode
-      connectionType = "apsta";
-    }
-
     return HttpResponse.json({
       status: "success",
       data: {
         status: "ok",
         uptime: Math.floor(Date.now() / 1000) % 86400, // Seconds in current day
         version: "v1.0.0-dev",
-        connection_type: connectionType,
       },
     });
   }),
@@ -170,52 +162,62 @@ export const handlers = [
     });
   }),
 
-  // Wi-Fi credentials (POST)
+  // Wi-Fi credentials (POST) - Save only
   http.post("/api/v1/wifi/credentials", async ({ request }) => {
     await delay(300);
     const body = (await request.json()) as { ssid: string; passphrase: string };
-    console.log("Mock: Received Wi-Fi credentials", body);
-
-    // Simulate connection process
-    wifiState.sta_connecting = true;
-    wifiState.sta_connected = false;
-    wifiState.sta_error = "";
-    wifiState.ip = "";
-    wifiState.connectedSsid = "";
-
-    // Simulate successful connection after a delay
-    setTimeout(() => {
-      // Simulate successful connection (95% success rate)
-      const isSuccess = Math.random() > 0.05;
-
-      if (isSuccess) {
-        wifiState.sta_connecting = false;
-        wifiState.sta_connected = true;
-        wifiState.sta_error = "";
-        wifiState.ip = "192.168.1." + Math.floor(Math.random() * 200 + 10);
-        wifiState.connectedSsid = body.ssid;
-        wifiState.disconnect_reason = 0;
-        console.log(`Mock: Successfully connected to ${body.ssid}`);
-      } else {
-        // Simulate connection failure
-        wifiState.sta_connecting = false;
-        wifiState.sta_connected = false;
-        wifiState.sta_error = "Authentication failed";
-        wifiState.ip = "";
-        wifiState.connectedSsid = "";
-        wifiState.disconnect_reason = 15; // AUTH_EXPIRE
-        console.log(`Mock: Failed to connect to ${body.ssid}`);
-      }
-    }, 2000);
+    console.log("Mock: Saved Wi-Fi credentials", body);
 
     return HttpResponse.json({
       status: "success",
-      data: {
-        restart_required: false,
-        sta_connect_started: true,
-        sta_error: "",
-      },
+      data: {},
     });
+  }),
+
+  // Wi-Fi connect (POST) - Connect using saved credentials
+  http.post("/api/v1/wifi/connect", async () => {
+    // Check if there are saved credentials (simulated - always assume there are)
+    const savedSsid = "MyHomeNetwork"; // Simulate saved SSID
+
+    console.log("Mock: Attempting to connect using saved credentials");
+
+    // Simulate connection attempt (takes ~2 seconds)
+    await delay(2000);
+
+    // Simulate successful connection (90% success rate)
+    const isSuccess = Math.random() > 0.1;
+
+    if (isSuccess) {
+      wifiState.sta_connecting = false;
+      wifiState.sta_connected = true;
+      wifiState.sta_error = "";
+      wifiState.ip = "192.168.1." + Math.floor(Math.random() * 200 + 10);
+      wifiState.connectedSsid = savedSsid;
+      wifiState.disconnect_reason = 0;
+      console.log(`Mock: Successfully connected to ${savedSsid}`);
+
+      return HttpResponse.json({
+        status: "success",
+        data: {},
+      });
+    } else {
+      // Simulate connection failure
+      wifiState.sta_connecting = false;
+      wifiState.sta_connected = false;
+      wifiState.sta_error = "Authentication failed";
+      wifiState.ip = "";
+      wifiState.connectedSsid = "";
+      wifiState.disconnect_reason = 15; // AUTH_EXPIRE
+      console.log(`Mock: Failed to connect to ${savedSsid}`);
+
+      return HttpResponse.json({
+        status: "error",
+        error: {
+          message: "Authentication failed (wrong password?)",
+          code: "ESP_ERR_WIFI_PASSWORD",
+        },
+      }, { status: 500 });
+    }
   }),
 
   // Device logs

@@ -7,7 +7,17 @@
 
 namespace earbrain::handlers {
 
-inline Gateway* get_gateway(httpd_req_t *req) {
+inline Gateway *get_gateway(httpd_req_t *req) {
+  if (!req) {
+    return nullptr;
+  }
+
+  if (auto *ctx = earbrain::get_request_context(req)) {
+    if (ctx->gateway) {
+      return ctx->gateway;
+    }
+  }
+
   auto *gateway = static_cast<Gateway *>(req->user_ctx);
   if (!gateway) {
     http::send_error(req, "Gateway unavailable", "gateway_unavailable");
@@ -22,11 +32,7 @@ inline std::string get_connection_type(httpd_req_t *req, Gateway *gateway) {
 
   WifiStatus status = gateway->wifi().status();
 
-  if (status.ap_active && status.sta_active && status.sta_connected) {
-    return "apsta";
-  }
-
-  if (status.sta_active && status.sta_connected) {
+  if (status.sta_active) {
     return "sta";
   }
 

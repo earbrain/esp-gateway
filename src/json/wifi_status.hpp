@@ -17,7 +17,6 @@ struct WifiStatus {
   std::string ip;
   wifi_err_reason_t disconnect_reason = WIFI_REASON_UNSPECIFIED;
   esp_err_t last_error = ESP_OK;
-  std::string connection_type;  // "ap", "sta", or "unknown"
 };
 
 inline json::Ptr to_json(const WifiStatus &status) {
@@ -56,10 +55,6 @@ inline json::Ptr to_json(const WifiStatus &status) {
 
   if (!cJSON_AddNumberToObject(obj.get(), "disconnect_reason",
                                static_cast<int>(status.disconnect_reason))) {
-    return nullptr;
-  }
-
-  if (json::add(obj.get(), "connection_type", status.connection_type) != ESP_OK) {
     return nullptr;
   }
 
