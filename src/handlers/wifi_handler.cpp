@@ -138,6 +138,7 @@ esp_err_t handle_status_get(httpd_req_t *req) {
   status.sta_connected = wifi_status.sta_connected;
   status.last_error = wifi_status.sta_last_error;
   status.disconnect_reason = wifi_status.sta_last_disconnect_reason;
+  status.connection_type = handlers::get_connection_type(req, gateway);
 
   const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&wifi_status.sta_ip);
   char ip_buffer[16] = {0};

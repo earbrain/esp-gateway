@@ -34,6 +34,12 @@ esp_err_t handle_health(httpd_req_t *req) {
     return ESP_ERR_NO_MEM;
   }
 
+  // Connection type (ap/sta/unknown)
+  std::string conn_type = handlers::get_connection_type(req, gateway);
+  if (json::add(data.get(), "connection_type", conn_type) != ESP_OK) {
+    return ESP_ERR_NO_MEM;
+  }
+
   return http::send_success(req, std::move(data));
 }
 

@@ -5,6 +5,13 @@ export type DeviceDetail = {
   idf_version: string;
 };
 
+export type HealthStatus = {
+  status: string;
+  uptime: number;
+  version: string;
+  connection_type: "ap" | "sta" | "apsta" | "unknown";
+};
+
 export type Metrics = {
   heap_total: number;
   heap_free: number;

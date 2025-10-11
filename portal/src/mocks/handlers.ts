@@ -10,6 +10,28 @@ const wifiState = {
 };
 
 export const handlers = [
+  // Health check
+  http.get("/health", async () => {
+    await delay(50);
+
+    // Determine connection type
+    let connectionType: "ap" | "sta" | "apsta" = "ap";
+    if (wifiState.sta_connected) {
+      // If STA is connected, show "apsta" to simulate dual mode
+      connectionType = "apsta";
+    }
+
+    return HttpResponse.json({
+      status: "success",
+      data: {
+        status: "ok",
+        uptime: Math.floor(Date.now() / 1000) % 86400, // Seconds in current day
+        version: "v1.0.0-dev",
+        connection_type: connectionType,
+      },
+    });
+  }),
+
   // Device information
   http.get("/api/v1/device", async () => {
     await delay(200);
