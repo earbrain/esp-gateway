@@ -1,0 +1,6 @@
+# WiFi stability configuration
+# Increase watchdog timeout to prevent timeout during WiFi connection
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=20
+
+# Increase main task stack size for WiFi initialization
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
