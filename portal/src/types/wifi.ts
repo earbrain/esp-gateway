@@ -38,5 +38,4 @@ export type WifiNetwork = {
   hidden: boolean;
   bssid: string;
   rssi: number;
-  lastPassphrase: string;
 };

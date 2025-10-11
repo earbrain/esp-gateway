@@ -2,7 +2,6 @@ import Router, { route, type RouterOnChangeArgs } from "preact-router";
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
-import { useHealth } from "./hooks/useHealth";
 import { HomePage } from "./pages/home";
 import { DeviceInfoPage } from "./pages/device/info";
 import { DeviceMetricsPage } from "./pages/device/metrics";
@@ -81,7 +80,6 @@ export function App() {
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const { health } = useHealth();
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
