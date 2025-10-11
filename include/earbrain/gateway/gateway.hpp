@@ -33,6 +33,9 @@ public:
   esp_err_t add_route(std::string_view uri, httpd_method_t method,
                       RequestHandler handler, const RouteOptions &options);
 
+  esp_err_t start_portal();
+  esp_err_t stop_portal();
+
   static const char *version() { return "0.0.0"; }
 
 private:

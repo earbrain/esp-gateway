@@ -55,6 +55,55 @@ esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
   return http_server.add_route(uri, method, handler, opts);
 }
 
+esp_err_t Gateway::start_portal() {
+  esp_err_t err = wifi_service.start_access_point(options.ap_config);
+  if (err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to start access point: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  ensure_builtin_routes();
+
+  err = http_server.start();
+  if (err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to start HTTP server: %s", esp_err_to_name(err));
+    wifi_service.stop_access_point();
+    return err;
+  }
+
+  err = mdns_service.start();
+  if (err != ESP_OK) {
+    logging::warnf(gateway_tag, "Failed to start mDNS service: %s", esp_err_to_name(err));
+  }
+
+  logging::info("Portal started successfully", gateway_tag);
+  return ESP_OK;
+}
+
+esp_err_t Gateway::stop_portal() {
+  esp_err_t mdns_err = mdns_service.stop();
+  if (mdns_err != ESP_OK) {
+    logging::warnf(gateway_tag, "Failed to stop mDNS service: %s", esp_err_to_name(mdns_err));
+  }
+
+  esp_err_t http_err = http_server.stop();
+  if (http_err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to stop HTTP server: %s", esp_err_to_name(http_err));
+  }
+
+  esp_err_t wifi_err = wifi_service.stop_access_point();
+  if (wifi_err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to stop access point: %s", esp_err_to_name(wifi_err));
+  }
+
+  if (http_err != ESP_OK || wifi_err != ESP_OK) {
+    return ESP_FAIL;
+  }
+
+  logging::info("Portal stopped successfully", gateway_tag);
+  return ESP_OK;
+}
+
 void Gateway::ensure_builtin_routes() {
   if (builtin_routes_registered) {
     return;

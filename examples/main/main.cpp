@@ -47,21 +47,10 @@ extern "C" void app_main(void) {
 
   earbrain::logging::infof(TAG, "Gateway version: %s", gateway.version());
 
-  // Start AP mode
-  if (gateway.wifi().start_access_point() != ESP_OK) {
-    earbrain::logging::error("Failed to start access point", TAG);
+  // Start portal (AP + HTTP server + mDNS)
+  if (gateway.start_portal() != ESP_OK) {
+    earbrain::logging::error("Failed to start portal", TAG);
     return;
-  }
-
-  // Start HTTP server
-  if (gateway.server().start() != ESP_OK) {
-    earbrain::logging::error("Failed to start HTTP server", TAG);
-    return;
-  }
-
-  // Start mDNS service
-  if (gateway.mdns().start() != ESP_OK) {
-    earbrain::logging::warn("Failed to start mDNS service", TAG);
   }
 
   while (true) {
