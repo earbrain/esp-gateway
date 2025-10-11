@@ -19,6 +19,7 @@
 #include "lwip/ip4_addr.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_task_wdt.h"
 
 namespace earbrain {
 
@@ -396,6 +397,8 @@ esp_err_t WifiService::start(const AccessPointConfig &ap_config) {
   // Poll connection status until success, failure, or timeout
   uint32_t elapsed_ms = 0;
   while (elapsed_ms < sta_connection_timeout_ms) {
+    esp_task_wdt_reset();
+
     vTaskDelay(pdMS_TO_TICKS(sta_connection_check_interval_ms));
     elapsed_ms += sta_connection_check_interval_ms;
 
