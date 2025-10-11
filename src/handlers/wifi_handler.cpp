@@ -101,12 +101,12 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
 
     logging::infof("gateway", "Starting Wi-Fi connection for SSID: %s", station_cfg.ssid.c_str());
 
-    const esp_err_t stop_err = gateway->stop_station();
+    const esp_err_t stop_err = gateway->wifi().stop_station();
     if (stop_err != ESP_OK) {
       logging::warnf("gateway", "Failed to stop existing station: %s", esp_err_to_name(stop_err));
     }
 
-    const esp_err_t sta_err = gateway->start_station(station_cfg);
+    const esp_err_t sta_err = gateway->wifi().start_station(station_cfg);
     if (sta_err == ESP_OK) {
       logging::infof("gateway", "Station connection initiated for SSID: %s", station_cfg.ssid.c_str());
     } else {

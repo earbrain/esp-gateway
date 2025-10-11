@@ -35,6 +35,8 @@ public:
   WifiService();
   ~WifiService() = default;
 
+  esp_err_t start(const AccessPointConfig &ap_config);
+
   esp_err_t start_access_point();
   esp_err_t start_access_point(const AccessPointConfig &config);
   esp_err_t stop_access_point();

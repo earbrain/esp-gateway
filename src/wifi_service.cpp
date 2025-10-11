@@ -17,6 +17,8 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "lwip/ip4_addr.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 namespace earbrain {
 
@@ -27,6 +29,8 @@ constexpr const char wifi_tag[] = "wifi";
 constexpr uint8_t sta_listen_interval = 1;
 constexpr int8_t sta_tx_power_qdbm = 78;
 constexpr int sta_max_connect_retries = 5;
+constexpr uint32_t sta_connection_timeout_ms = 15000;
+constexpr uint32_t sta_connection_check_interval_ms = 500;
 
 int signal_quality_from_rssi(int32_t rssi) {
   if (rssi <= -100) {
@@ -365,6 +369,62 @@ esp_err_t WifiService::start_station() {
   autoconnect_attempted = true;
 
   return start_station(*credentials);
+}
+
+esp_err_t WifiService::start(const AccessPointConfig &ap_config) {
+  // Try to start in STA mode with saved credentials
+  esp_err_t sta_err = start_station();
+
+  if (sta_err == ESP_ERR_NOT_FOUND) {
+    logging::info("No saved credentials found, starting in AP mode", wifi_tag);
+    return start_access_point(ap_config);
+  }
+
+  if (sta_err != ESP_OK) {
+    logging::warnf(wifi_tag, "Failed to start STA mode: %s, falling back to AP mode",
+                   esp_err_to_name(sta_err));
+    return start_access_point(ap_config);
+  }
+
+  auto credentials = credentials_store.get();
+  if (credentials) {
+    logging::infof(wifi_tag, "Connecting to SSID: '%s'", credentials->ssid.c_str());
+  }
+
+  logging::info("Waiting for STA connection...", wifi_tag);
+
+  // Poll connection status until success, failure, or timeout
+  uint32_t elapsed_ms = 0;
+  while (elapsed_ms < sta_connection_timeout_ms) {
+    vTaskDelay(pdMS_TO_TICKS(sta_connection_check_interval_ms));
+    elapsed_ms += sta_connection_check_interval_ms;
+
+    WifiStatus wifi_status = status();
+
+    if (wifi_status.sta_connected) {
+      logging::info("Successfully connected to WiFi in STA mode", wifi_tag);
+      return ESP_OK;
+    }
+
+    if (!wifi_status.sta_connecting && wifi_status.sta_last_error != ESP_OK) {
+      logging::warnf(wifi_tag, "STA connection failed: %s",
+                     esp_err_to_name(wifi_status.sta_last_error));
+      break;
+    }
+  }
+
+  if (elapsed_ms >= sta_connection_timeout_ms) {
+    logging::warn("STA connection timeout", wifi_tag);
+  }
+
+  esp_err_t stop_err = stop_station();
+  if (stop_err != ESP_OK) {
+    logging::warnf(wifi_tag, "Failed to stop STA mode: %s",
+                   esp_err_to_name(stop_err));
+  }
+
+  logging::info("Falling back to AP mode", wifi_tag);
+  return start_access_point(ap_config);
 }
 
 esp_err_t WifiService::stop_station() {

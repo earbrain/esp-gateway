@@ -10,22 +10,18 @@
 
 namespace earbrain {
 
+struct GatewayOptions {
+  AccessPointConfig ap_config{"gateway-ap"};
+  MdnsConfig mdns_config{"esp-gateway", "ESP Gateway", "_http", "_tcp", 80};
+};
+
 class Gateway {
 public:
   Gateway();
+  Gateway(const GatewayOptions &options);
   ~Gateway();
 
-  esp_err_t start_access_point();
-  esp_err_t start_access_point(const AccessPointConfig &config);
-  esp_err_t stop_access_point();
-  esp_err_t start_station();
-  esp_err_t start_station(const StationConfig &config);
-  esp_err_t stop_station();
-  esp_err_t start_server();
-  esp_err_t stop_server();
-  esp_err_t start_mdns();
-  esp_err_t start_mdns(const MdnsConfig &config);
-  esp_err_t stop_mdns();
+  esp_err_t start();
 
   esp_err_t save_wifi_credentials(std::string_view ssid, std::string_view passphrase);
 
@@ -43,6 +39,7 @@ public:
 private:
   void ensure_builtin_routes();
 
+  GatewayOptions options;
   WifiService wifi_service;
   HttpServer http_server;
   MdnsService mdns_service;
