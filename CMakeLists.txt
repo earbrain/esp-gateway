@@ -53,3 +53,10 @@ idf_component_register(
 )
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_20)
+
+# Add version from idf_component.yml as compile definition
+file(READ "${CMAKE_CURRENT_LIST_DIR}/idf_component.yml" IDF_COMPONENT_YML)
+string(REGEX MATCH "version: *([0-9]+\\.[0-9]+\\.[0-9]+)" _ "${IDF_COMPONENT_YML}")
+set(GATEWAY_VERSION "${CMAKE_MATCH_1}")
+target_compile_definitions(${COMPONENT_LIB} PUBLIC GATEWAY_VERSION="${GATEWAY_VERSION}")
+message(STATUS "Set GATEWAY_VERSION to: ${GATEWAY_VERSION}")

@@ -23,6 +23,7 @@ public:
 
   WifiService &wifi() { return wifi_service; }
   MdnsService &mdns() { return mdns_service; }
+
   HttpServer &server() {
     ensure_builtin_routes();
     return http_server;
@@ -36,7 +37,13 @@ public:
   esp_err_t start_portal();
   esp_err_t stop_portal();
 
-  static const char *version() { return "0.0.0"; }
+  static const char *version() {
+#ifdef GATEWAY_VERSION
+    return GATEWAY_VERSION;
+#else
+    return "unknown";
+#endif
+  }
 
 private:
   void ensure_builtin_routes();
