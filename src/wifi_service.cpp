@@ -85,17 +85,6 @@ wifi_config_t make_sta_config(const StationConfig &config) {
   return cfg;
 }
 
-bool should_retry_reason(wifi_err_reason_t reason) {
-  switch (reason) {
-  case WIFI_REASON_AUTH_LEAVE:
-  case WIFI_REASON_ASSOC_LEAVE:
-  case WIFI_REASON_STA_LEAVING:
-    return false;
-  default:
-    return true;
-  }
-}
-
 } // namespace
 
 WifiService::WifiService()
@@ -434,26 +423,6 @@ void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event
   logging::warnf(wifi_tag, "Station disconnected (reason=%d)",
                  static_cast<int>(event.reason));
 
-  const wifi_err_reason_t reason = static_cast<wifi_err_reason_t>(event.reason);
-  wifi_mode_t mode = WIFI_MODE_NULL;
-  if (esp_wifi_get_mode(&mode) != ESP_OK) {
-    mode = WIFI_MODE_NULL;
-  }
-  if ((mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) && should_retry_reason(reason) &&
-      sta_retry_count < sta_max_connect_retries) {
-    ++sta_retry_count;
-    const esp_err_t err = esp_wifi_connect();
-    if (err == ESP_OK || err == ESP_ERR_WIFI_CONN) {
-      logging::infof(wifi_tag, "Retrying station connection (attempt %d/%d)",
-                     sta_retry_count.load(), sta_max_connect_retries);
-    } else {
-      logging::warnf(wifi_tag, "Failed to trigger reconnect attempt %d: %s",
-                     sta_retry_count.load(), esp_err_to_name(err));
-    }
-  } else if (sta_retry_count >= sta_max_connect_retries) {
-    logging::warnf(wifi_tag, "Station retries exhausted after %d attempts",
-                   sta_max_connect_retries);
-  }
 }
 
 WifiScanResult WifiService::perform_scan() {
