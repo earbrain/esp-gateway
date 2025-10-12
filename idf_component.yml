@@ -3,4 +3,7 @@ version: 0.1.0
 license: MIT
 url: https://github.com/EarEEG-dev/esp-gateway
 dependencies:
-  espressif/mdns: "*"
+  espressif/mdns:
+    version: "*"
+    rules:
+      - if: "idf_version >=5.0"
