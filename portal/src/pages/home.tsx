@@ -12,7 +12,7 @@ export const HomePage: FunctionalComponent<HomePageProps> = ({
     <div class="card space-y-4">
       <div>
         <h2 class="section-title">Device Information</h2>
-        <p class="muted text-sm">View device model and firmware details</p>
+        <p class="muted text-sm">View device model and gateway version</p>
       </div>
       <button
         type="button"

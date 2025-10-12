@@ -1,6 +1,6 @@
 export type DeviceDetail = {
   model: string;
-  firmware_version: string;
+  gateway_version: string;
   build_time: string;
   idf_version: string;
 };

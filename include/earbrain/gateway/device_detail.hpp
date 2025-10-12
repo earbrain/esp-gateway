@@ -6,7 +6,7 @@ namespace earbrain {
 
 struct DeviceDetail {
   std::string model;
-  std::string firmware_version;
+  std::string gateway_version;
   std::string build_time;
   std::string idf_version;
 };

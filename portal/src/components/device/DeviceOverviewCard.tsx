@@ -22,8 +22,8 @@ export const DeviceOverviewCard: FunctionalComponent = () => {
             <dd>{info.model}</dd>
           </div>
           <div class="info-row">
-            <dt>Firmware</dt>
-            <dd>{info.firmware_version}</dd>
+            <dt>Gateway Version</dt>
+            <dd>{info.gateway_version}</dd>
           </div>
           <div class="info-row">
             <dt>Build Time</dt>

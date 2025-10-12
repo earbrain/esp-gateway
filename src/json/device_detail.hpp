@@ -14,7 +14,7 @@ inline json::Ptr to_json(const DeviceDetail &detail) {
   if (json::add(obj.get(), "model", detail.model) != ESP_OK) {
     return json::Ptr{};
   }
-  if (json::add(obj.get(), "firmware_version", detail.firmware_version) !=
+  if (json::add(obj.get(), "gateway_version", detail.gateway_version) !=
       ESP_OK) {
     return json::Ptr{};
   }

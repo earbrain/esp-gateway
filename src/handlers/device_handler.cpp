@@ -51,7 +51,7 @@ esp_err_t handle_get(httpd_req_t *req) {
 
   DeviceDetail detail;
   detail.model = chip_model_string(chip_info);
-  detail.firmware_version = gateway->version();
+  detail.gateway_version = gateway->version();
   detail.build_time = build_timestamp;
   detail.idf_version = esp_get_idf_version();
 

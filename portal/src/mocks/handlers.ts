@@ -30,7 +30,7 @@ export const handlers = [
       status: "success",
       data: {
         model: "ESP32-Gateway-Mock",
-        firmware_version: "v1.0.0-dev",
+        gateway_version: "v1.0.0-dev",
         build_time: "2025-10-09 12:00:00",
         idf_version: "v5.0.0",
       },
