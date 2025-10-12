@@ -1,8 +1,8 @@
 # esp-gateway
 
-[日本語 README](README_ja.md)
-
-ESP-IDF library that provides both a Wi-Fi captive portal and REST APIs. The device can launch its own Wi-Fi access point and web portal so users can inspect and configure it from a browser, and it also exposes APIs for programmatic control.
+ESP-IDF 向けの Wi-Fi ポータルと REST API を提供するライブラリです。
+デバイスが自前の Wi-Fi アクセスポイントと Web ポータルを立ち上げ、ブラウザ経由で状態確認・設定を行えます。
+また API 経由でデバイス情報の取得や操作も実行できます。
 
 <p align="center">
   <img src="docs/images/portal-ui.jpeg" alt="ESP Gateway Portal" width="50%">
@@ -11,16 +11,16 @@ ESP-IDF library that provides both a Wi-Fi captive portal and REST APIs. The dev
 </p>
 
 ## Status
-- Active development. Interfaces and APIs may change without notice.
+- 現在進行中のプロジェクトです。仕様や API は今後変更される可能性があります。
 
 ## Features
-- Start a Wi-Fi access point with a captive portal
-- Serve REST endpoints for device info, metrics, logs, Wi-Fi configuration, and mDNS data
-- Bundle a static frontend (`portal/dist`) for an intuitive browser UI
+- キャプティブポータル付きの Wi-Fi アクセスポイントを起動
+- デバイス情報・メトリクス・ログ・Wi-Fi 設定・mDNS を扱う REST API を提供
+- 静的フロントエンド（`portal/dist`）によるブラウザ UI
 
 ## Requirements
-- ESP-IDF with `idf.py` available
-- Node.js / npm for building the portal assets
+- ESP-IDF (`idf.py` が実行できること)
+- Node.js / npm（UIのビルド用）
 
 ## Quick Start
 ```bash
@@ -29,7 +29,7 @@ npm install
 npm run build
 
 cd ../examples
-idf.py set-target esp32   # first time only
+idf.py set-target esp32   # 初回のみ
 idf.py build flash monitor
 ```
 
