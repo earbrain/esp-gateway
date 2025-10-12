@@ -234,7 +234,7 @@ esp_err_t WifiService::start_access_point(const AccessPointConfig &config) {
   sta_retry_count = 0;
   sta_last_error = ESP_OK;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
-  sta_ip.addr = 0;
+  sta_ip.store({.addr = 0});
   logging::infof(wifi_tag, "Access point started (APSTA mode): %s", ap_config.ssid.c_str());
   return ESP_OK;
 }
@@ -301,7 +301,7 @@ esp_err_t WifiService::connect(const StationConfig &config) {
   sta_retry_count = 0;
   sta_last_error = ESP_OK;
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
-  sta_ip.addr = 0;
+  sta_ip.store({.addr = 0});
   logging::infof(wifi_tag, "Station connection initiated (APSTA mode): ssid='%s', passphrase_len=%zu",
                  sta_config.ssid.c_str(), sta_config.passphrase.size());
 
@@ -337,18 +337,18 @@ esp_err_t WifiService::connect(const StationConfig &config) {
 
       // Map disconnect reason to error code
       switch (sta_last_disconnect_reason) {
-        case WIFI_REASON_AUTH_EXPIRE:
-        case WIFI_REASON_AUTH_FAIL:
-        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
-        case WIFI_REASON_HANDSHAKE_TIMEOUT:
-          sta_last_error = ESP_ERR_WIFI_PASSWORD;
-          break;
-        case WIFI_REASON_NO_AP_FOUND:
-          sta_last_error = ESP_ERR_WIFI_SSID;
-          break;
-        default:
-          sta_last_error = ESP_FAIL;
-          break;
+      case WIFI_REASON_AUTH_EXPIRE:
+      case WIFI_REASON_AUTH_FAIL:
+      case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+      case WIFI_REASON_HANDSHAKE_TIMEOUT:
+        sta_last_error = ESP_ERR_WIFI_PASSWORD;
+        break;
+      case WIFI_REASON_NO_AP_FOUND:
+        sta_last_error = ESP_ERR_WIFI_SSID;
+        break;
+      default:
+        sta_last_error = ESP_FAIL;
+        break;
       }
       return sta_last_error;
     }
@@ -416,10 +416,11 @@ void WifiService::on_sta_got_ip(const ip_event_got_ip_t &event) {
   sta_connected = true;
   sta_retry_count = 0;
   sta_last_error = ESP_OK;
-  sta_ip = event.ip_info.ip;
+  sta_ip.store(event.ip_info.ip);
   sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
 
-  const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&sta_ip);
+  esp_ip4_addr_t ip = sta_ip.load();
+  const ip4_addr_t *ip4 = reinterpret_cast<const ip4_addr_t *>(&ip);
   char ip_buffer[16] = {0};
   ip4addr_ntoa_r(ip4, ip_buffer, sizeof(ip_buffer));
   logging::infof(wifi_tag, "Station got IP: %s", ip_buffer);
@@ -428,7 +429,7 @@ void WifiService::on_sta_got_ip(const ip_event_got_ip_t &event) {
 void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
   sta_connected = false;
   sta_last_disconnect_reason = static_cast<wifi_err_reason_t>(event.reason);
-  sta_ip.addr = 0;
+  sta_ip.store({.addr = 0});
   logging::warnf(wifi_tag, "Station disconnected (reason=%d)",
                  static_cast<int>(event.reason));
 
@@ -443,10 +444,10 @@ void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event
     const esp_err_t err = esp_wifi_connect();
     if (err == ESP_OK || err == ESP_ERR_WIFI_CONN) {
       logging::infof(wifi_tag, "Retrying station connection (attempt %d/%d)",
-                     sta_retry_count, sta_max_connect_retries);
+                     sta_retry_count.load(), sta_max_connect_retries);
     } else {
       logging::warnf(wifi_tag, "Failed to trigger reconnect attempt %d: %s",
-                     sta_retry_count, esp_err_to_name(err));
+                     sta_retry_count.load(), esp_err_to_name(err));
     }
   } else if (sta_retry_count >= sta_max_connect_retries) {
     logging::warnf(wifi_tag, "Station retries exhausted after %d attempts",
@@ -542,10 +543,10 @@ WifiStatus WifiService::status() const {
   s.sta_active = (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA);
 
   if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
-    s.sta_connected = sta_connected;
-    s.sta_ip = sta_ip;
-    s.sta_last_disconnect_reason = sta_last_disconnect_reason;
-    s.sta_last_error = sta_last_error;
+    s.sta_connected = sta_connected.load();
+    s.sta_ip = sta_ip.load();
+    s.sta_last_disconnect_reason = sta_last_disconnect_reason.load();
+    s.sta_last_error = sta_last_error.load();
   } else {
     s.sta_connected = false;
     s.sta_ip.addr = 0;

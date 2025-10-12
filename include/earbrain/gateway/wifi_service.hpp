@@ -7,6 +7,7 @@
 #include "esp_netif_ip_addr.h"
 #include "esp_netif_types.h"
 #include "esp_wifi_types.h"
+#include <atomic>
 #include <string_view>
 
 struct esp_netif_obj;
@@ -63,11 +64,11 @@ private:
   StationConfig sta_config;
   bool initialized;
   bool handlers_registered;
-  bool sta_connected;
-  int sta_retry_count;
-  esp_ip4_addr_t sta_ip;
-  wifi_err_reason_t sta_last_disconnect_reason;
-  esp_err_t sta_last_error;
+  std::atomic<bool> sta_connected;
+  std::atomic<int> sta_retry_count;
+  std::atomic<esp_ip4_addr_t> sta_ip;
+  std::atomic<wifi_err_reason_t> sta_last_disconnect_reason;
+  std::atomic<esp_err_t> sta_last_error;
   WifiCredentialStore credentials_store;
 };
 
