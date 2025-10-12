@@ -1,6 +1,6 @@
 # esp-gateway
 
-[日本語 README](README_ja.md)
+[日本語 README](README_ja.md) | [Documentation](https://earbrain.github.io/esp-gateway)
 
 ESP-IDF library that provides both a Wi-Fi captive portal and REST APIs. The device can launch its own Wi-Fi access point and web portal so users can inspect and configure it from a browser, and it also exposes APIs for programmatic control.
 

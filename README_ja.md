@@ -1,5 +1,7 @@
 # esp-gateway
 
+[English README](README.md) | [ドキュメント](https://earbrain.github.io/esp-gateway)
+
 ESP-IDF 向けの Wi-Fi ポータルと REST API を提供するライブラリです。
 デバイスが自前の Wi-Fi アクセスポイントと Web ポータルを立ち上げ、ブラウザ経由で状態確認・設定を行えます。
 また API 経由でデバイス情報の取得や操作も実行できます。
