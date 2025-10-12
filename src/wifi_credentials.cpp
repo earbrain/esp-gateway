@@ -17,7 +17,7 @@ constexpr const char wifi_nvs_pass_key[] = "sta_pass";
 
 constexpr const char wifi_tag[] = "wifi_credentials";
 
-std::optional<std::string> read_nvs_string(nvs_handle_t handle, const char* key, esp_err_t& err) {
+std::optional<std::string> read_nvs_string(nvs_handle_t handle, const char *key, esp_err_t &err) {
   size_t len = 0;
   err = nvs_get_str(handle, key, nullptr, &len);
 
@@ -56,7 +56,7 @@ std::optional<std::string> read_nvs_string(nvs_handle_t handle, const char* key,
 } // namespace
 
 esp_err_t WifiCredentialStore::save(std::string_view ssid,
-                                     std::string_view passphrase) {
+                                    std::string_view passphrase) {
   nvs_handle_t handle = 0;
   esp_err_t err = nvs_open(wifi_nvs_namespace, NVS_READWRITE, &handle);
   if (err != ESP_OK) {
@@ -137,7 +137,11 @@ esp_err_t WifiCredentialStore::load() {
   return ESP_OK;
 }
 
-std::optional<StationConfig> WifiCredentialStore::get() const {
+std::optional<StationConfig> WifiCredentialStore::get() {
+  if (!loaded_) {
+    load();
+  }
+
   if (!saved_config_.ssid.empty()) {
     return saved_config_;
   }

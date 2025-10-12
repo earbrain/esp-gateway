@@ -17,12 +17,11 @@ public:
   WifiCredentialStore() = default;
 
   esp_err_t save(std::string_view ssid, std::string_view passphrase);
-  esp_err_t load();
-
-  std::optional<StationConfig> get() const;
-  bool is_loaded() const noexcept { return loaded_; }
+  std::optional<StationConfig> get();
 
 private:
+  esp_err_t load();
+
   StationConfig saved_config_;
   bool loaded_ = false;
 };

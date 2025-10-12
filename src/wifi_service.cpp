@@ -152,13 +152,6 @@ esp_err_t WifiService::ensure_initialized() {
     initialized = true;
   }
 
-  if (!credentials_store.is_loaded()) {
-    err = credentials_store.load();
-    if (err != ESP_OK) {
-      return err;
-    }
-  }
-
   err = register_event_handlers();
   if (err != ESP_OK) {
     return err;
