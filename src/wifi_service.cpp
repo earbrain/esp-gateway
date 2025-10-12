@@ -90,7 +90,7 @@ wifi_config_t make_sta_config(const StationConfig &config) {
 WifiService::WifiService()
   : softap_netif(nullptr), sta_netif(nullptr), ap_config{}, sta_config{},
     initialized(false), handlers_registered(false), sta_connected(false),
-    sta_retry_count(0), sta_ip{},
+    sta_retry_count(0), sta_manual_disconnect(false), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
     sta_last_error(ESP_OK), credentials_store{} {
 }
@@ -260,11 +260,15 @@ esp_err_t WifiService::connect(const StationConfig &config) {
   }
 
   // Disconnect if already connected
+  sta_manual_disconnect.store(true);
   esp_err_t disconnect_err = esp_wifi_disconnect();
-  if (disconnect_err != ESP_OK && disconnect_err != ESP_ERR_WIFI_NOT_STARTED &&
-      disconnect_err != ESP_ERR_WIFI_NOT_INIT && disconnect_err != ESP_ERR_WIFI_NOT_CONNECT) {
-    logging::warnf(wifi_tag, "Failed to disconnect before reconnecting: %s",
-                   esp_err_to_name(disconnect_err));
+  if (disconnect_err != ESP_OK) {
+    sta_manual_disconnect.store(false);
+    if (disconnect_err != ESP_ERR_WIFI_NOT_STARTED &&
+        disconnect_err != ESP_ERR_WIFI_NOT_INIT &&
+        disconnect_err != ESP_ERR_WIFI_NOT_CONNECT) {
+      logging::warnf(wifi_tag, "Failed to disconnect before reconnecting: %s", esp_err_to_name(disconnect_err));
+    }
   }
 
   // Configure STA interface
@@ -418,11 +422,19 @@ void WifiService::on_sta_got_ip(const ip_event_got_ip_t &event) {
 
 void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event) {
   sta_connected = false;
-  sta_last_disconnect_reason = static_cast<wifi_err_reason_t>(event.reason);
   sta_ip.store({.addr = 0});
+  const bool manual = sta_manual_disconnect.exchange(false);
+
+  if (manual && event.reason == WIFI_REASON_ASSOC_LEAVE) {
+    sta_last_disconnect_reason = WIFI_REASON_UNSPECIFIED;
+    sta_last_error = ESP_OK;
+    logging::info("Station disconnected intentionally (manual reconnect)", wifi_tag);
+    return;
+  }
+
+  sta_last_disconnect_reason = static_cast<wifi_err_reason_t>(event.reason);
   logging::warnf(wifi_tag, "Station disconnected (reason=%d)",
                  static_cast<int>(event.reason));
-
 }
 
 WifiScanResult WifiService::perform_scan() {
