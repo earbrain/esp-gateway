@@ -5,9 +5,9 @@ ESP-IDF 向けの Wi-Fi ポータルと REST API を提供するライブラリ�
 また API 経由でデバイス情報の取得や操作も実行できます。
 
 <p align="center">
-  <img src="docs/images/portal-ui.jpeg" alt="ESP Gateway Portal" width="50%">
+  <img src="docs/images/portal-ui.jpeg" alt="ESP Gateway Portal">
   <br>
-  <img src="docs/images/portal-ui-2.jpeg" alt="ESP Gateway Portal Advanced" width="50%">
+  <img src="docs/images/portal-ui-2.jpeg" alt="ESP Gateway Portal Advanced">
 </p>
 
 ## Status

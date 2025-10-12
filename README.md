@@ -5,9 +5,9 @@
 ESP-IDF library that provides both a Wi-Fi captive portal and REST APIs. The device can launch its own Wi-Fi access point and web portal so users can inspect and configure it from a browser, and it also exposes APIs for programmatic control.
 
 <p align="center">
-  <img src="docs/images/portal-ui.jpeg" alt="ESP Gateway Portal" width="50%">
+  <img src="docs/images/portal-ui.jpeg" alt="ESP Gateway Portal">
   <br>
-  <img src="docs/images/portal-ui-2.jpeg" alt="ESP Gateway Portal Advanced" width="50%">
+  <img src="docs/images/portal-ui-2.jpeg" alt="ESP Gateway Portal Advanced">
 </p>
 
 ## Status
