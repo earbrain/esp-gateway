@@ -75,25 +75,25 @@ esp_err_t MdnsService::start(const MdnsConfig &config) {
     return err;
   }
 
-  config_ = std::move(applied);
+  mdns_config = std::move(applied);
   service_registered = true;
-  registered_service_type = config_.service_type;
-  registered_protocol = config_.protocol;
+  registered_service_type = mdns_config.service_type;
+  registered_protocol = mdns_config.protocol;
   running = true;
 
   logging::infof(mdns_tag,
                  "mDNS started: host=%s instance=%s service=%s protocol=%s port=%u",
-                 config_.hostname.c_str(),
-                 config_.instance_name.c_str(),
-                 config_.service_type.c_str(),
-                 config_.protocol.c_str(),
-                 static_cast<unsigned>(config_.port));
+                 mdns_config.hostname.c_str(),
+                 mdns_config.instance_name.c_str(),
+                 mdns_config.service_type.c_str(),
+                 mdns_config.protocol.c_str(),
+                 static_cast<unsigned>(mdns_config.port));
 
   return ESP_OK;
 }
 
 esp_err_t MdnsService::start() {
-  return start(config_);
+  return start(mdns_config);
 }
 
 esp_err_t MdnsService::stop() {

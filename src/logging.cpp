@@ -43,22 +43,22 @@ std::string format_message(const char *format, va_list args) {
 
 } // namespace
 
-LogStore::LogStore() : entries_(), next_id_(0) {}
+LogStore::LogStore() : entries(), next_id(0) {}
 
 void LogStore::log(esp_log_level_t level, std::string_view tag,
                    std::string message) {
   const uint32_t timestamp_ms = esp_log_timestamp();
 
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::mutex> lock(mutex);
   LogEntry entry;
-  entry.id = next_id_++;
+  entry.id = next_id++;
   entry.timestamp_ms = timestamp_ms;
   entry.level = level;
   entry.tag = std::string(tag);
   entry.message = std::move(message);
-  entries_.push_back(std::move(entry));
-  if (entries_.size() > max_entries) {
-    entries_.pop_front();
+  entries.push_back(std::move(entry));
+  if (entries.size() > max_entries) {
+    entries.pop_front();
   }
 }
 
@@ -67,17 +67,17 @@ LogBatch LogStore::collect(uint64_t cursor, std::size_t limit) const {
   const std::size_t effective_limit =
       std::clamp<std::size_t>(limit, std::size_t{1}, max_entries);
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (entries_.empty()) {
+  std::lock_guard<std::mutex> lock(mutex);
+  if (entries.empty()) {
     batch.next_cursor = cursor;
     batch.has_more = false;
     return batch;
   }
 
-  batch.entries.reserve(std::min(effective_limit, entries_.size()));
+  batch.entries.reserve(std::min(effective_limit, entries.size()));
   const bool skip_by_cursor = cursor > 0;
 
-  for (const auto &entry : entries_) {
+  for (const auto &entry : entries) {
     if (skip_by_cursor && entry.id <= cursor) {
       continue;
     }
@@ -90,14 +90,14 @@ LogBatch LogStore::collect(uint64_t cursor, std::size_t limit) const {
   const uint64_t cursor_reference =
       batch.entries.empty() ? cursor : batch.entries.back().id;
   batch.next_cursor = cursor_reference;
-  batch.has_more = entries_.back().id > cursor_reference;
+  batch.has_more = entries.back().id > cursor_reference;
 
   return batch;
 }
 
 void LogStore::clear() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  entries_.clear();
+  std::lock_guard<std::mutex> lock(mutex);
+  entries.clear();
 }
 
 Logger &Logger::instance() {
@@ -105,7 +105,7 @@ Logger &Logger::instance() {
   return logger;
 }
 
-Logger::Logger() : store_() {}
+Logger::Logger() : store() {}
 
 void Logger::info(std::string_view message, std::string_view tag) {
   write(ESP_LOG_INFO, tag, message);
@@ -204,17 +204,17 @@ void Logger::debugf(const char *tag, const char *format, ...) {
 }
 
 LogBatch Logger::collect(uint64_t cursor, std::size_t limit) const {
-  return store_.collect(cursor, limit);
+  return store.collect(cursor, limit);
 }
 
-void Logger::clear() { store_.clear(); }
+void Logger::clear() { store.clear(); }
 
 void Logger::write(esp_log_level_t level, std::string_view tag,
                    std::string_view message) {
   const std::string tag_copy = normalise_tag(tag);
   const std::string message_copy(message);
 
-  store_.log(level, tag_copy, message_copy);
+  store.log(level, tag_copy, message_copy);
   std::string line_for_stdout = message_copy;
   if (line_for_stdout.empty() || line_for_stdout.back() != '\n') {
     line_for_stdout.push_back('\n');

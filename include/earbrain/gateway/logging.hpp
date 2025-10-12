@@ -35,9 +35,9 @@ public:
   static constexpr std::size_t max_entries = 1024;
 
 private:
-  mutable std::mutex mutex_;
-  std::deque<LogEntry> entries_;
-  uint64_t next_id_;
+  mutable std::mutex mutex;
+  std::deque<LogEntry> entries;
+  uint64_t next_id;
 };
 
 class Logger {
@@ -69,7 +69,7 @@ private:
   void write(esp_log_level_t level, std::string_view tag,
              std::string_view message);
 
-  LogStore store_;
+  LogStore store;
 };
 
 Logger &get_logger();

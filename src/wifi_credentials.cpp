@@ -78,24 +78,24 @@ esp_err_t WifiCredentialStore::save(std::string_view ssid,
   nvs_close(handle);
 
   if (err == ESP_OK) {
-    saved_config_.ssid = std::string(ssid);
-    saved_config_.passphrase = std::string(passphrase);
-    loaded_ = true;
+    saved_config.ssid = std::string(ssid);
+    saved_config.passphrase = std::string(passphrase);
+    loaded = true;
   }
 
   return err;
 }
 
 esp_err_t WifiCredentialStore::load() {
-  if (loaded_) {
+  if (loaded) {
     return ESP_OK;
   }
 
   nvs_handle_t handle = 0;
   esp_err_t err = nvs_open(wifi_nvs_namespace, NVS_READONLY, &handle);
   if (err == ESP_ERR_NVS_NOT_FOUND) {
-    saved_config_ = StationConfig{};
-    loaded_ = true;
+    saved_config = StationConfig{};
+    loaded = true;
     logging::info("No saved Wi-Fi credentials found", wifi_tag);
     return ESP_OK;
   }
@@ -111,8 +111,8 @@ esp_err_t WifiCredentialStore::load() {
   }
 
   if (!ssid_opt) {
-    saved_config_ = StationConfig{};
-    loaded_ = true;
+    saved_config = StationConfig{};
+    loaded = true;
     nvs_close(handle);
     logging::info("No saved Wi-Fi credentials found", wifi_tag);
     return ESP_OK;
@@ -127,23 +127,23 @@ esp_err_t WifiCredentialStore::load() {
 
   nvs_close(handle);
 
-  saved_config_.ssid = std::move(*ssid_opt);
-  saved_config_.passphrase = pass_opt ? std::move(*pass_opt) : std::string{};
-  loaded_ = true;
+  saved_config.ssid = std::move(*ssid_opt);
+  saved_config.passphrase = pass_opt ? std::move(*pass_opt) : std::string{};
+  loaded = true;
 
   logging::infof(wifi_tag, "Loaded saved Wi-Fi credentials for SSID: %s",
-                 saved_config_.ssid.c_str());
+                 saved_config.ssid.c_str());
 
   return ESP_OK;
 }
 
 std::optional<StationConfig> WifiCredentialStore::get() {
-  if (!loaded_) {
+  if (!loaded) {
     load();
   }
 
-  if (!saved_config_.ssid.empty()) {
-    return saved_config_;
+  if (!saved_config.ssid.empty()) {
+    return saved_config;
   }
   return std::nullopt;
 }

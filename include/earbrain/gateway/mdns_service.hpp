@@ -16,19 +16,19 @@ struct MdnsConfig {
 class MdnsService {
 public:
   MdnsService() = default;
-  MdnsService(const MdnsConfig &config) : config_(config) {}
+  MdnsService(const MdnsConfig &config) : mdns_config(config) {}
 
   esp_err_t start(const MdnsConfig &config);
   esp_err_t start();
   esp_err_t stop();
 
   bool is_running() const noexcept { return running; }
-  const MdnsConfig &config() const noexcept { return config_; }
+  const MdnsConfig &config() const noexcept { return mdns_config; }
 
 private:
   esp_err_t ensure_initialized();
 
-  MdnsConfig config_;
+  MdnsConfig mdns_config;
   bool initialized = false;
   bool service_registered = false;
   bool running = false;

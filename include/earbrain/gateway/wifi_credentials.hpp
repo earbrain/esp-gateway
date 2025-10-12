@@ -22,8 +22,8 @@ public:
 private:
   esp_err_t load();
 
-  StationConfig saved_config_;
-  bool loaded_ = false;
+  StationConfig saved_config;
+  bool loaded = false;
 };
 
 } // namespace earbrain
