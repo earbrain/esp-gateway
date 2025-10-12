@@ -277,20 +277,6 @@ esp_err_t WifiService::connect(const StationConfig &config) {
     return ESP_ERR_INVALID_STATE;
   }
 
-  // Disconnect from current STA connection if any
-  if (sta_connected) {
-    esp_err_t disconnect_err = esp_wifi_disconnect();
-    if (disconnect_err != ESP_OK && disconnect_err != ESP_ERR_WIFI_NOT_INIT &&
-        disconnect_err != ESP_ERR_WIFI_NOT_STARTED &&
-        disconnect_err != ESP_ERR_WIFI_NOT_CONNECT) {
-      logging::warnf(wifi_tag, "Failed to disconnect before reconnect: %s",
-                     esp_err_to_name(disconnect_err));
-    }
-
-    // Wait for disconnect to complete
-    vTaskDelay(pdMS_TO_TICKS(100));
-  }
-
   // Configure STA interface
   wifi_config_t sta_cfg = make_sta_config(config);
   err = esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
@@ -344,7 +330,7 @@ esp_err_t WifiService::connect(const StationConfig &config) {
     }
 
     // Disconnected with a reason (e.g., wrong password)
-    if (!sta_connected && sta_last_disconnect_reason != WIFI_REASON_UNSPECIFIED) {
+    if (sta_last_disconnect_reason != WIFI_REASON_UNSPECIFIED) {
       logging::errorf(wifi_tag,
                       "Connection failed (disconnect_reason=%d)",
                       static_cast<int>(sta_last_disconnect_reason));
