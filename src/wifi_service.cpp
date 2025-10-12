@@ -270,6 +270,14 @@ esp_err_t WifiService::connect(const StationConfig &config) {
     return ESP_ERR_INVALID_STATE;
   }
 
+  // Disconnect if already connected
+  esp_err_t disconnect_err = esp_wifi_disconnect();
+  if (disconnect_err != ESP_OK && disconnect_err != ESP_ERR_WIFI_NOT_STARTED &&
+      disconnect_err != ESP_ERR_WIFI_NOT_INIT && disconnect_err != ESP_ERR_WIFI_NOT_CONNECT) {
+    logging::warnf(wifi_tag, "Failed to disconnect before reconnecting: %s",
+                   esp_err_to_name(disconnect_err));
+  }
+
   // Configure STA interface
   wifi_config_t sta_cfg = make_sta_config(config);
   err = esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
