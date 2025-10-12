@@ -1,5 +1,5 @@
 name: esp_gateway
-version: 0.1.0
+version: 0.1.1
 license: MIT
 url: https://github.com/EarEEG-dev/esp-gateway
 dependencies:
