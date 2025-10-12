@@ -79,7 +79,7 @@ const en = {
   "wifi.status.ap.title": "Access Point",
   "wifi.status.ap.active": "Active",
   "wifi.status.ap.inactive": "Inactive",
-  "wifi.status.ap.descriptionActive": "Device is broadcasting the setup access point.",
+  "wifi.status.ap.descriptionActive": "Device is broadcasting the access point.",
   "wifi.status.ap.descriptionInactive": "Soft AP is currently disabled.",
   "wifi.status.ap.descriptionUnknown": "Waiting for status update.",
   "wifi.status.sta.title": "Station",
@@ -226,8 +226,7 @@ const ja: typeof en = {
   "wifi.status.ap.title": "アクセスポイント",
   "wifi.status.ap.active": "有効",
   "wifi.status.ap.inactive": "無効",
-  "wifi.status.ap.descriptionActive":
-    "セットアップ用アクセスポイントをブロードキャストしています。",
+  "wifi.status.ap.descriptionActive": "アクセスポイントをブロードキャストしています。",
   "wifi.status.ap.descriptionInactive": "ソフト AP は現在停止しています。",
   "wifi.status.ap.descriptionUnknown": "状態更新を待機しています。",
   "wifi.status.sta.title": "ステーション",
