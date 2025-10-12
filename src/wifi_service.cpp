@@ -439,7 +439,7 @@ void WifiService::on_sta_disconnected(const wifi_event_sta_disconnected_t &event
   if (esp_wifi_get_mode(&mode) != ESP_OK) {
     mode = WIFI_MODE_NULL;
   }
-  if (mode == WIFI_MODE_STA && should_retry_reason(reason) &&
+  if ((mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) && should_retry_reason(reason) &&
       sta_retry_count < sta_max_connect_retries) {
     ++sta_retry_count;
     const esp_err_t err = esp_wifi_connect();
