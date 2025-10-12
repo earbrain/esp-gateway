@@ -1,10 +1,12 @@
 import { useEffect } from "preact/hooks";
 import type { FunctionalComponent } from "preact";
+import { useTranslation } from "../../i18n/context";
 import { useApi } from "../../hooks/useApi";
 import { usePolling } from "../../hooks/usePolling";
 import type { LogResponse } from "../../types/device";
 
 export const DeviceLogsCard: FunctionalComponent = () => {
+  const t = useTranslation();
   const {
     data: logs,
     loading: logsLoading,
@@ -28,9 +30,11 @@ export const DeviceLogsCard: FunctionalComponent = () => {
   return (
     <div class="card space-y-4">
       <div class="flex items-center justify-between gap-4">
-        <h2 class="section-title">Device Logs</h2>
+        <h2 class="section-title">{t("page.logs.title")}</h2>
         <div class="flex items-center gap-3">
-          {logsLoading && hasEntries && <span class="text-xs text-slate-500">Updating...</span>}
+          {logsLoading && hasEntries && (
+            <span class="text-xs text-slate-500">{t("common.updating")}</span>
+          )}
           <button
             type="button"
             class="btn-secondary"
@@ -39,7 +43,7 @@ export const DeviceLogsCard: FunctionalComponent = () => {
             }}
             disabled={logsLoading}
           >
-            Refresh
+            {t("common.refresh")}
           </button>
         </div>
       </div>
@@ -53,7 +57,7 @@ export const DeviceLogsCard: FunctionalComponent = () => {
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-            aria-label="Loading logs"
+            aria-label={t("logs.loadingAria")}
           >
             <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
             <path d="M21 12a9 9 0 0 0-9-9"></path>
@@ -67,10 +71,10 @@ export const DeviceLogsCard: FunctionalComponent = () => {
             <table class="w-full min-w-[560px] table-auto text-left text-sm text-slate-700">
               <thead>
                 <tr class="text-xs uppercase tracking-wide text-slate-500">
-                  <th class="px-3 py-2">Time (ms)</th>
-                  <th class="px-3 py-2">Level</th>
-                  <th class="px-3 py-2">Tag</th>
-                  <th class="px-3 py-2">Message</th>
+                  <th class="px-3 py-2">{t("logs.columns.time")}</th>
+                  <th class="px-3 py-2">{t("logs.columns.level")}</th>
+                  <th class="px-3 py-2">{t("logs.columns.tag")}</th>
+                  <th class="px-3 py-2">{t("logs.columns.message")}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200">
@@ -105,14 +109,14 @@ export const DeviceLogsCard: FunctionalComponent = () => {
           </div>
           {logs?.has_more && (
             <p class="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">
-              Showing latest {entries.length} entries. More logs are available on the device.
+              {t("logs.moreEntries", { count: entries.length })}
             </p>
           )}
         </div>
       ) : (
         !logsLoading && (
           <div class="rounded border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-            Logs will appear here once the device emits output.
+            {t("logs.emptyState")}
           </div>
         )
       )}

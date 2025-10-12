@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { FunctionalComponent } from "preact";
+import { useTranslation } from "../../i18n/context";
 import { useApi } from "../../hooks/useApi";
 import type { WifiNetwork, WifiScanResponse, WifiResponse } from "../../types/wifi";
 import { WifiSignalIndicator } from "./WifiSignalIndicator";
 import { SecurityBadge } from "./SecurityBadge";
 
-const LoadingSpinner: FunctionalComponent<{ label?: string }> = ({ label }) => (
-  <div class="flex items-center gap-2 text-sm text-slate-500" role="status" aria-live="polite">
-    <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sky-500"></span>
-    <span>{label ?? "Loading..."}</span>
-  </div>
-);
+const LoadingSpinner: FunctionalComponent<{ label?: string }> = ({ label }) => {
+  const t = useTranslation();
+  return (
+    <div class="flex items-center gap-2 text-sm text-slate-500" role="status" aria-live="polite">
+      <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sky-500"></span>
+      <span>{label ?? t("common.loading")}</span>
+    </div>
+  );
+};
 
 type WifiNetworkListProps = {
   onError?: (message: string) => void;
@@ -20,6 +24,7 @@ type WifiNetworkListProps = {
 const isHexKey = (value: string) => /^[0-9a-fA-F]+$/.test(value);
 
 export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onError, onConnectionComplete }) => {
+  const t = useTranslation();
   const [networks, setNetworks] = useState<WifiNetwork[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -157,22 +162,22 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
     const isHexCandidate = trimmedPassword.length === 64 && isHexKey(trimmedPassword);
 
     if (!trimmedSsid) {
-      setValidationError("Please enter an SSID.");
+      setValidationError(t("wifi.config.validation.missingSsid"));
       return null;
     }
 
     if (trimmedSsid.length < 1 || trimmedSsid.length > 32) {
-      setValidationError("SSID must be 1-32 characters.");
+      setValidationError(t("wifi.config.validation.ssidLength"));
       return null;
     }
 
     if (trimmedPassword && !isLengthValid && !isHexCandidate) {
-      setValidationError("Password must be 8-63 characters or a 64-digit hex string.");
+      setValidationError(t("wifi.config.validation.invalidPassword"));
       return null;
     }
 
     return { ssid: trimmedSsid, passphrase: trimmedPassword };
-  }, [ssid, password]);
+  }, [ssid, password, t]);
 
   const handleSubmit = useCallback(async (e: Event) => {
     e.preventDefault();
@@ -189,15 +194,15 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
       });
 
       if (response) {
-        setSuccessMessage(`Credentials saved for ${credentials.ssid}`);
+        setSuccessMessage(t("wifi.config.success.saved", { ssid: credentials.ssid }));
       } else {
-        setValidationError("Failed to save credentials. Please try again.");
+        setValidationError(t("wifi.config.error.saveFailed"));
       }
     } catch (err) {
       console.error(err);
-      setValidationError("An unexpected error occurred. Please try again.");
+      setValidationError(t("wifi.config.error.unexpected"));
     }
-  }, [validateCredentials, saveCredentials]);
+  }, [validateCredentials, saveCredentials, t]);
 
   const handleConnectSubmit = useCallback(async (e: Event) => {
     e.preventDefault();
@@ -215,7 +220,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
       });
 
       if (!saveResponse) {
-        setValidationError("Failed to save credentials. Please try again.");
+        setValidationError(t("wifi.config.error.saveFailed"));
         return;
       }
 
@@ -223,35 +228,33 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
       const connectResponse = await connectWifi({});
 
       if (connectResponse) {
-        setSuccessMessage(`Successfully connected to ${credentials.ssid}`);
+        setSuccessMessage(t("wifi.config.success.connected", { ssid: credentials.ssid }));
       } else {
-        setValidationError("Failed to connect. Please try again.");
+        setValidationError(t("wifi.config.error.connectFailed"));
       }
     } catch (err) {
       console.error(err);
-      setValidationError("An unexpected error occurred. Please try again.");
+      setValidationError(t("wifi.config.error.unexpected"));
     } finally {
       // Always refresh status after connection attempt (success or failure)
       if (onConnectionComplete) {
         onConnectionComplete();
       }
     }
-  }, [validateCredentials, saveCredentials, connectWifi]);
+  }, [validateCredentials, saveCredentials, connectWifi, onConnectionComplete, t]);
 
   return (
     <>
       <div class="card">
         <div class="mb-5">
-          <h2 class="section-title !mb-1">Wi-Fi Configuration</h2>
-          <p class="text-sm text-slate-500">
-            Enter your Wi-Fi credentials or scan for nearby networks.
-          </p>
+          <h2 class="section-title !mb-1">{t("wifi.config.title")}</h2>
+          <p class="text-sm text-slate-500">{t("wifi.config.description")}</p>
         </div>
 
         <form onSubmit={handleSubmit} class="space-y-4">
           <div class="form-field">
             <label for="ssid-input">
-              <span>Network (SSID)</span>
+              <span>{t("wifi.config.networkLabel")}</span>
             </label>
             <div class="flex gap-2">
               <input
@@ -264,7 +267,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                   setValidationError(null);
                   setSuccessMessage(null);
                 }}
-                placeholder="Enter SSID"
+                placeholder={t("wifi.config.networkPlaceholder")}
                 maxLength={32}
                 disabled={isSaving || isConnecting}
               />
@@ -274,14 +277,14 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 onClick={handleScan}
                 disabled={isScanning || isSaving || isConnecting}
               >
-                {isScanning ? "Scanning..." : "Scan"}
+                {isScanning ? t("wifi.config.scanning") : t("wifi.config.scan")}
               </button>
             </div>
           </div>
 
           <div class="form-field">
             <label for="password-input">
-              <span>Password</span>
+              <span>{t("wifi.config.passwordLabel")}</span>
             </label>
             <div class="flex gap-2">
               <input
@@ -294,7 +297,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                   setValidationError(null);
                   setSuccessMessage(null);
                 }}
-                placeholder="8-63 characters or 64-digit hex (optional)"
+                placeholder={t("wifi.config.passwordPlaceholder")}
                 maxLength={64}
                 disabled={isSaving || isConnecting}
               />
@@ -307,7 +310,9 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                     disabled={isSaving || isConnecting}
                     class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-2 focus:ring-sky-200 focus:ring-offset-0 disabled:opacity-50"
                   />
-                  <span class="text-sm text-slate-600 whitespace-nowrap">Show</span>
+                  <span class="text-sm text-slate-600 whitespace-nowrap">
+                    {t("wifi.config.showPassword")}
+                  </span>
                 </label>
               </div>
             </div>
@@ -331,7 +336,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
               class="btn-secondary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isSaving || isConnecting || !ssid.trim()}
             >
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? t("wifi.config.saving") : t("wifi.config.save")}
             </button>
             <button
               type="button"
@@ -339,7 +344,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
               disabled={isSaving || isConnecting || !ssid.trim()}
               onClick={handleConnectSubmit}
             >
-              {isConnecting ? "Connecting..." : "Save & Connect"}
+              {isConnecting ? t("wifi.config.connecting") : t("wifi.config.saveAndConnect")}
             </button>
           </div>
         </form>
@@ -351,27 +356,27 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
           <button
             type="button"
             class="flex-1"
-            aria-label="Close modal"
+            aria-label={t("common.closeModal")}
             onClick={() => setShowModal(false)}
             disabled={isScanning}
           />
           <div class="w-full max-h-[70vh] rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden flex flex-col">
             <div class="p-6 pb-4 border-b border-slate-200">
               <div class="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200"></div>
-              <h3 class="text-lg font-semibold text-slate-900">Available Networks</h3>
-              <p class="mt-1 text-sm text-slate-500">Select a network to auto-fill the SSID</p>
+              <h3 class="text-lg font-semibold text-slate-900">{t("wifi.config.modal.title")}</h3>
+              <p class="mt-1 text-sm text-slate-500">{t("wifi.config.modal.description")}</p>
             </div>
 
             <div class="flex-1 overflow-y-auto p-6 pt-4">
               {isScanning && (
                 <div class="py-8 text-center">
-                  <LoadingSpinner label="Scanning for networks..." />
+                  <LoadingSpinner label={t("wifi.config.modal.scanning")} />
                 </div>
               )}
 
               {!isScanning && networks.length === 0 && (
                 <div class="py-8 text-center text-sm text-slate-500">
-                  No networks found. Try scanning again.
+                  {t("wifi.config.modal.empty")}
                 </div>
               )}
 
@@ -389,13 +394,16 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                         <div class="flex items-center gap-2 text-xs text-slate-500">
                           <SecurityBadge security={network.security} />
                           {network.connected && (
-                            <span class="text-sky-600">Connected</span>
+                            <span class="text-sky-600">{t("wifi.config.modal.connected")}</span>
                           )}
                         </div>
                       </div>
                       <WifiSignalIndicator
                         strength={network.signal}
-                        label={`Signal strength for ${network.ssid}: ${network.rssi} dBm`}
+                        label={t("wifi.config.modal.signalLabel", {
+                          ssid: network.ssid,
+                          rssi: network.rssi,
+                        })}
                       />
                     </button>
                   ))}
@@ -409,7 +417,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 class="btn-secondary w-full"
                 onClick={() => setShowModal(false)}
               >
-                Close
+                {t("wifi.config.modal.close")}
               </button>
             </div>
           </div>

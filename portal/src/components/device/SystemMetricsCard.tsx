@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "preact/hooks";
 import type { FunctionalComponent } from "preact";
+import { useTranslation } from "../../i18n/context";
 import { useApi } from "../../hooks/useApi";
 import { usePolling } from "../../hooks/usePolling";
 import type { Metrics } from "../../types/device";
@@ -18,6 +19,7 @@ const formatBytes = (value: number): string => {
 };
 
 export const SystemMetricsCard: FunctionalComponent = () => {
+  const t = useTranslation();
   const {
     data: metrics,
     loading: metricsLoading,
@@ -47,7 +49,7 @@ export const SystemMetricsCard: FunctionalComponent = () => {
   return (
     <div class="card space-y-4">
       <div class="flex items-center justify-between gap-4">
-        <h2 class="section-title">System Metrics</h2>
+        <h2 class="section-title">{t("page.metrics.title")}</h2>
         <button
           type="button"
           class="btn-secondary"
@@ -56,37 +58,39 @@ export const SystemMetricsCard: FunctionalComponent = () => {
           }}
           disabled={metricsLoading}
         >
-          Refresh
+          {t("common.refresh")}
         </button>
       </div>
-      {showMetricsLoading && <p class="muted">Loading...</p>}
+      {showMetricsLoading && <p class="muted">{t("common.loading")}</p>}
       {metricsError && <p class="error-text">{metricsError}</p>}
       {metrics && (
         <div class="space-y-5 text-sm text-slate-700">
           <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Heap</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("metrics.section.heap")}
+            </h3>
             <dl class="mt-2 grid gap-3">
               <div class="info-row">
-                <dt>Total Heap</dt>
+                <dt>{t("metrics.totalHeap")}</dt>
                 <dd>{formatBytes(metrics.heap_total)}</dd>
               </div>
               <div class="info-row">
-                <dt>Heap Used</dt>
+                <dt>{t("metrics.heapUsed")}</dt>
                 <dd>
                   {formatBytes(metrics.heap_used)}{" "}
                   <span class="muted text-xs">({heapUsagePercent}%)</span>
                 </dd>
               </div>
               <div class="info-row">
-                <dt>Heap Free</dt>
+                <dt>{t("metrics.heapFree")}</dt>
                 <dd>{formatBytes(metrics.heap_free)}</dd>
               </div>
               <div class="info-row">
-                <dt>Minimum Free (Watermark)</dt>
+                <dt>{t("metrics.heapMinFree")}</dt>
                 <dd>{formatBytes(metrics.heap_min_free)}</dd>
               </div>
               <div class="info-row">
-                <dt>Largest Free Block</dt>
+                <dt>{t("metrics.heapLargestFree")}</dt>
                 <dd>{formatBytes(metrics.heap_largest_free_block)}</dd>
               </div>
             </dl>

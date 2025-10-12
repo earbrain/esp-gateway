@@ -1,4 +1,5 @@
 import type { FunctionalComponent } from "preact";
+import { useTranslation } from "../../i18n/context";
 
 type WifiSignalIndicatorProps = {
   strength: number;
@@ -17,12 +18,16 @@ export const WifiSignalIndicator: FunctionalComponent<WifiSignalIndicatorProps> 
   strength,
   label,
 }) => {
+  const t = useTranslation();
   const level = getSignalLevel(strength);
   const bars = [0, 1, 2, 3];
   const heights = [8, 12, 16, 20];
 
   return (
-    <span class="flex items-end gap-1" aria-label={label ?? `Signal strength ${level} of 4`}>
+    <span
+      class="flex items-end gap-1"
+      aria-label={label ?? t("wifi.signalIndicator.aria", { level })}
+    >
       {bars.map((index) => (
         <span
           key={index}

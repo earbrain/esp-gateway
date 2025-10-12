@@ -1,5 +1,6 @@
 import { useEffect } from "preact/hooks";
 import type { FunctionalComponent } from "preact";
+import { useTranslation } from "../i18n/context";
 
 export type ToastProps = {
   message: string;
@@ -14,6 +15,7 @@ export const Toast: FunctionalComponent<ToastProps> = ({
   onClose,
   durationMs = 3000,
 }) => {
+  const t = useTranslation();
   useEffect(() => {
     if (!message) {
       return;
@@ -38,7 +40,7 @@ export const Toast: FunctionalComponent<ToastProps> = ({
         type="button"
         class="rounded-full px-2 text-lg font-bold text-inherit transition hover:bg-white/40"
         onClick={onClose}
-        aria-label="Dismiss"
+        aria-label={t("common.dismiss")}
       >
         ×
       </button>

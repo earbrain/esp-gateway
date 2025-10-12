@@ -1,14 +1,17 @@
+import { useTranslation } from "../i18n/context";
+import type { TranslationKey } from "../i18n/translations";
+
 type ConnectionType = "ap" | "sta" | "apsta" | "unknown";
 
 type ConnectionBadgeProps = {
   type: ConnectionType;
 };
 
-const connectionLabels: Record<ConnectionType, string> = {
-  ap: "Setup Mode (AP Mode)",
-  sta: "WiFi Mode (STA Mode)",
-  apsta: "Dual Mode (AP+STA)",
-  unknown: "Unknown",
+const connectionLabelKeys: Record<ConnectionType, TranslationKey> = {
+  ap: "connection.badge.ap",
+  sta: "connection.badge.sta",
+  apsta: "connection.badge.apsta",
+  unknown: "connection.badge.unknown",
 };
 
 const connectionColors: Record<ConnectionType, string> = {
@@ -19,7 +22,8 @@ const connectionColors: Record<ConnectionType, string> = {
 };
 
 export function ConnectionBadge({ type }: ConnectionBadgeProps) {
-  const label = connectionLabels[type];
+  const t = useTranslation();
+  const label = t(connectionLabelKeys[type]);
   const colorClass = connectionColors[type];
 
   return (

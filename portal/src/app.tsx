@@ -2,6 +2,9 @@ import Router, { route, type RouterOnChangeArgs } from "preact-router";
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
+import { LanguageSelector } from "./components/LanguageSelector";
+import { useTranslation } from "./i18n/context";
+import type { TranslationKey } from "./i18n/translations";
 import { HomePage } from "./pages/home";
 import { DeviceInfoPage } from "./pages/device/info";
 import { DeviceMetricsPage } from "./pages/device/metrics";
@@ -11,16 +14,16 @@ import { WifiPage } from "./pages/wifi";
 
 type NavItem = {
   path: string;
-  label: string;
+  labelKey: TranslationKey;
 };
 
 const navItems: NavItem[] = [
-  { path: "/", label: "Home" },
-  { path: "/device/info", label: "Device Info" },
-  { path: "/device/metrics", label: "Metrics" },
-  { path: "/device/logs", label: "Logs" },
-  { path: "/device/mdns", label: "mDNS" },
-  { path: "/wifi", label: "Wi-Fi" },
+  { path: "/", labelKey: "nav.home" },
+  { path: "/device/info", labelKey: "nav.deviceInfo" },
+  { path: "/device/metrics", labelKey: "nav.deviceMetrics" },
+  { path: "/device/logs", labelKey: "nav.deviceLogs" },
+  { path: "/device/mdns", labelKey: "nav.deviceMdns" },
+  { path: "/wifi", labelKey: "nav.wifi" },
 ];
 
 const normalizeUrl = (url: string) => {
@@ -37,44 +40,60 @@ const normalizeUrl = (url: string) => {
 const pageMetaMap: Record<string, PageMeta> = {
   "/device/info": {
     showHeader: true,
-    title: "Device Information",
-    description: "View device model and firmware details",
-    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Device Info" }],
+    titleKey: "page.deviceInfo.title",
+    descriptionKey: "page.deviceInfo.description",
+    breadcrumbs: [
+      { labelKey: "nav.home", path: "/" },
+      { labelKey: "page.deviceInfo.breadcrumb" },
+    ],
   },
   "/device/metrics": {
     showHeader: true,
-    title: "System Metrics",
-    description: "Monitor memory and system health",
-    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Metrics" }],
+    titleKey: "page.metrics.title",
+    descriptionKey: "page.metrics.description",
+    breadcrumbs: [
+      { labelKey: "nav.home", path: "/" },
+      { labelKey: "page.metrics.breadcrumb" },
+    ],
   },
   "/device/logs": {
     showHeader: true,
-    title: "Device Logs",
-    description: "View real-time device logs",
-    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Logs" }],
+    titleKey: "page.logs.title",
+    descriptionKey: "page.logs.description",
+    breadcrumbs: [
+      { labelKey: "nav.home", path: "/" },
+      { labelKey: "page.logs.breadcrumb" },
+    ],
   },
   "/device/mdns": {
     showHeader: true,
-    title: "mDNS Configuration",
-    description: "Check mDNS settings and status",
-    breadcrumbs: [{ label: "Home", path: "/" }, { label: "mDNS" }],
+    titleKey: "page.mdns.title",
+    descriptionKey: "page.mdns.description",
+    breadcrumbs: [
+      { labelKey: "nav.home", path: "/" },
+      { labelKey: "page.mdns.breadcrumb" },
+    ],
   },
   "/wifi": {
     showHeader: true,
-    title: "Wi-Fi",
-    description: "Update Wi-Fi credentials",
-    breadcrumbs: [{ label: "Home", path: "/" }, { label: "Wi-Fi" }],
+    titleKey: "page.wifi.title",
+    descriptionKey: "page.wifi.description",
+    breadcrumbs: [
+      { labelKey: "nav.home", path: "/" },
+      { labelKey: "page.wifi.breadcrumb" },
+    ],
   },
 };
 
 const defaultMeta: PageMeta = {
   showHeader: false,
-  title: "",
-  description: "",
+  titleKey: "app.title",
+  descriptionKey: "app.title",
   breadcrumbs: [],
 };
 
 export function App() {
+  const t = useTranslation();
   const [currentUrl, setCurrentUrl] = useState<string>(() =>
     typeof window !== "undefined" ? window.location.pathname : "/",
   );
@@ -124,15 +143,16 @@ export function App() {
     <div class="min-h-screen bg-slate-100 text-slate-900">
       <header class="bg-white/95 shadow-sm">
         <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-4">
-          <h1 class="text-xl font-semibold text-slate-900">ESP Gateway</h1>
+          <h1 class="text-xl font-semibold text-slate-900">{t("app.title")}</h1>
           <div class="flex items-center gap-3">
+            <LanguageSelector />
             <nav class="relative" ref={menuRef}>
               <button
                 type="button"
                 class="menu-toggle"
                 aria-haspopup="true"
                 aria-expanded={menuOpen}
-                aria-label="Open navigation"
+                aria-label={t("app.menu.toggle")}
                 onClick={(event) => {
                   event.stopPropagation();
                   setMenuOpen((prev) => !prev);
@@ -157,7 +177,7 @@ export function App() {
                         navigate(item.path);
                       }}
                     >
-                      {item.label}
+                      {t(item.labelKey)}
                     </button>
                   ))}
                 </div>

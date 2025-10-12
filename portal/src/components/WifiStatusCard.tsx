@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "preact/hooks";
 import type { FunctionalComponent } from "preact";
+import { useTranslation } from "../i18n/context";
 import { useApi } from "../hooks/useApi";
 import type { WifiStatus } from "../types/wifi";
 
@@ -15,6 +16,7 @@ type WifiStatusCardProps = {
 };
 
 export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refresh }) => {
+  const t = useTranslation();
   const {
     data: status,
     loading: statusLoading,
@@ -30,48 +32,50 @@ export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refre
   const statusSummary = useMemo(() => {
     if (!status) {
       if (statusLoading) {
-        return "Checking Wi-Fi status...";
+        return t("wifi.status.summary.checking");
       }
-      return "Status unavailable";
+      return t("wifi.status.summary.unavailable");
     }
     if (status.sta_connected) {
-      return status.ip ? `Connected to ${status.ip}` : "Connected";
+      return status.ip
+        ? t("wifi.status.summary.connectedWithIp", { ip: status.ip })
+        : t("wifi.status.summary.connected");
     }
     if (status.sta_error && status.sta_error.length > 0) {
-      return `Connection error: ${status.sta_error}`;
+      return t("wifi.status.summary.connectionError", { message: status.sta_error });
     }
-    return "Not connected";
-  }, [status, statusLoading]);
+    return t("wifi.status.summary.notConnected");
+  }, [status, statusLoading, t]);
 
   const apState = useMemo(() => {
     if (!status) {
       return {
-        label: "Unknown",
-        description: "Waiting for status update.",
+        label: t("common.unknown"),
+        description: t("wifi.status.ap.descriptionUnknown"),
         badgeClass: "status-pill bg-slate-200 text-slate-600",
       };
     }
     if (status.ap_active) {
       return {
-        label: "Active",
-        description: "Device is broadcasting the setup access point.",
+        label: t("wifi.status.ap.active"),
+        description: t("wifi.status.ap.descriptionActive"),
         badgeClass: "status-pill bg-emerald-100 text-emerald-700",
       };
     }
     return {
-      label: "Inactive",
-      description: "Soft AP is currently disabled.",
+      label: t("wifi.status.ap.inactive"),
+      description: t("wifi.status.ap.descriptionInactive"),
       badgeClass: "status-pill bg-slate-200 text-slate-600",
     };
-  }, [status]);
+  }, [status, t]);
 
   const staState = useMemo(() => {
     if (!status) {
       return {
-        label: statusLoading ? "Checking" : "Unknown",
+        label: statusLoading ? t("wifi.status.sta.checking") : t("common.unknown"),
         description: statusLoading
-          ? "Fetching the latest station status..."
-          : "Waiting for status update.",
+          ? t("wifi.status.sta.descriptionChecking")
+          : t("wifi.status.ap.descriptionUnknown"),
         badgeClass: statusLoading
           ? "status-pill bg-sky-100 text-sky-600"
           : "status-pill bg-slate-200 text-slate-600",
@@ -79,73 +83,73 @@ export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refre
     }
     if (status.sta_connected) {
       return {
-        label: "Connected",
+        label: t("wifi.status.sta.connected"),
         description: status.ip
-          ? `Client connected with IP ${status.ip}.`
-          : "Client connected to Wi-Fi network.",
+          ? t("wifi.status.sta.descriptionConnectedWithIp", { ip: status.ip })
+          : t("wifi.status.sta.descriptionConnected"),
         badgeClass: "status-pill bg-emerald-100 text-emerald-700",
       };
     }
     if (status.sta_error && status.sta_error.length > 0) {
       return {
-        label: "Error",
-        description: `Last error: ${status.sta_error}.`,
+        label: t("wifi.status.sta.error"),
+        description: t("wifi.status.sta.descriptionError", { message: status.sta_error }),
         badgeClass: "status-pill bg-rose-100 text-rose-700",
       };
     }
     return {
-      label: "Not connected",
-      description: "STA client is idle.",
+      label: t("wifi.status.sta.notConnected"),
+      description: t("wifi.status.sta.descriptionIdle"),
       badgeClass: "status-pill bg-slate-200 text-slate-600",
     };
-  }, [status, statusLoading]);
+  }, [status, statusLoading, t]);
 
   return (
     <div class="card">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="section-title !mb-0">Wi-Fi Status</h2>
+        <h2 class="section-title !mb-0">{t("wifi.status.title")}</h2>
         {statusLoading && <Spinner />}
       </div>
       <p class="text-sm text-slate-600">{statusSummary}</p>
       <div class="mt-4 grid gap-4 md:grid-cols-2">
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-slate-800">Access Point</h3>
+            <h3 class="text-sm font-semibold text-slate-800">{t("wifi.status.ap.title")}</h3>
             <span class={apState.badgeClass}>{apState.label}</span>
           </div>
           <p class="mt-2 text-sm text-slate-600">{apState.description}</p>
           {status && (
             <dl class="mt-3 space-y-2 text-sm text-slate-700">
               <div class="info-row">
-                <dt>Broadcasting</dt>
-                <dd>{status.ap_active ? "Yes" : "No"}</dd>
+                <dt>{t("wifi.status.fields.broadcasting")}</dt>
+                <dd>{status.ap_active ? t("common.yes") : t("common.no")}</dd>
               </div>
             </dl>
           )}
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-slate-800">Station</h3>
+            <h3 class="text-sm font-semibold text-slate-800">{t("wifi.status.sta.title")}</h3>
             <span class={staState.badgeClass}>{staState.label}</span>
           </div>
           <p class="mt-2 text-sm text-slate-600">{staState.description}</p>
           {status && (
             <dl class="mt-3 space-y-2 text-sm text-slate-700">
               <div class="info-row">
-                <dt>Enabled</dt>
-                <dd>{status.sta_active ? "Yes" : "No"}</dd>
+                <dt>{t("wifi.status.fields.enabled")}</dt>
+                <dd>{status.sta_active ? t("common.yes") : t("common.no")}</dd>
               </div>
               <div class="info-row">
-                <dt>IP Address</dt>
+                <dt>{t("wifi.status.fields.ipAddress")}</dt>
                 <dd>{status.ip || "-"}</dd>
               </div>
               <div class="info-row">
-                <dt>Disconnect Reason</dt>
+                <dt>{t("wifi.status.fields.disconnectReason")}</dt>
                 <dd>{status.disconnect_reason}</dd>
               </div>
               <div class="info-row">
-                <dt>Last Error</dt>
-                <dd>{status.sta_error || "None"}</dd>
+                <dt>{t("wifi.status.fields.lastError")}</dt>
+                <dd>{status.sta_error || t("common.none")}</dd>
               </div>
             </dl>
           )}
@@ -153,7 +157,7 @@ export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refre
       </div>
       <div class="mt-4 flex justify-end">
         <button type="button" class="btn-secondary" onClick={() => fetchStatus()}>
-          Refresh
+          {t("common.refresh")}
         </button>
       </div>
     </div>

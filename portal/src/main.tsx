@@ -1,6 +1,7 @@
-import { render } from 'preact';
-import { App } from './app';
-import './styles.css';
+import { render } from "preact";
+import { App } from "./app";
+import { TranslationProvider } from "./i18n/context";
+import "./styles.css";
 
 async function enableMocking() {
   if (import.meta.env.DEV) {
@@ -13,5 +14,10 @@ async function enableMocking() {
 }
 
 enableMocking().then(() => {
-  render(<App />, document.getElementById('root')!);
+  render(
+    <TranslationProvider>
+      <App />
+    </TranslationProvider>,
+    document.getElementById("root")!,
+  );
 });
