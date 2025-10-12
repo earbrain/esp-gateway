@@ -331,11 +331,13 @@ esp_err_t WifiService::connect(const StationConfig &config) {
 
       // Map disconnect reason to error code
       switch (sta_last_disconnect_reason) {
-      case WIFI_REASON_AUTH_EXPIRE:
       case WIFI_REASON_AUTH_FAIL:
+        sta_last_error = ESP_ERR_WIFI_PASSWORD;
+        break;
+      case WIFI_REASON_AUTH_EXPIRE:
       case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
       case WIFI_REASON_HANDSHAKE_TIMEOUT:
-        sta_last_error = ESP_ERR_WIFI_PASSWORD;
+        sta_last_error = ESP_ERR_TIMEOUT;
         break;
       case WIFI_REASON_NO_AP_FOUND:
         sta_last_error = ESP_ERR_WIFI_SSID;

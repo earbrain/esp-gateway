@@ -200,18 +200,18 @@ export const handlers = [
     } else {
       // Simulate connection failure
       wifiState.sta_connected = false;
-      wifiState.sta_error = "Authentication failed";
+      wifiState.sta_error = "Connection timeout";
       wifiState.ip = "";
       wifiState.connectedSsid = "";
-      wifiState.disconnect_reason = 15; // AUTH_EXPIRE
+      wifiState.disconnect_reason = 2; // AUTH_EXPIRE
       console.log(`Mock: Failed to connect to ${savedSsid}`);
 
       return HttpResponse.json({
         status: "error",
         error: {
-          message: "Authentication failed (wrong password?)",
-          code: "ESP_ERR_WIFI_PASSWORD",
-        },
+          message: "Connection timeout",
+          code: "ESP_ERR_TIMEOUT",
+      },
       }, { status: 500 });
     }
   }),

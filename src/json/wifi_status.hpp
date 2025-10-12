@@ -18,6 +18,23 @@ struct WifiStatus {
   esp_err_t last_error = ESP_OK;
 };
 
+inline std::string map_wifi_error_to_message(esp_err_t err) {
+  switch (err) {
+  case ESP_OK:
+    return "";
+  case ESP_ERR_WIFI_PASSWORD:
+    return "Authentication failed (wrong password?)";
+  case ESP_ERR_WIFI_SSID:
+    return "Network not found";
+  case ESP_ERR_TIMEOUT:
+    return "Connection timeout";
+  case ESP_ERR_INVALID_STATE:
+    return "WiFi not in correct mode (APSTA required)";
+  default:
+    return esp_err_to_name(err);
+  }
+}
+
 inline json::Ptr to_json(const WifiStatus &status) {
   auto obj = json::object();
   if (!obj) {
@@ -38,10 +55,8 @@ inline json::Ptr to_json(const WifiStatus &status) {
     return nullptr;
   }
 
-  const char *error_name = status.last_error == ESP_OK
-                             ? ""
-                             : esp_err_to_name(status.last_error);
-  if (json::add(obj.get(), "sta_error", error_name) != ESP_OK) {
+  const std::string error_message = map_wifi_error_to_message(status.last_error);
+  if (json::add(obj.get(), "sta_error", error_message.c_str()) != ESP_OK) {
     return nullptr;
   }
 
@@ -58,4 +73,3 @@ inline json::Ptr to_json(const WifiStatus &status) {
 }
 
 } // namespace earbrain::json_model
-
