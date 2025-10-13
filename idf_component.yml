@@ -2,10 +2,3 @@ name: esp_gateway
 version: 0.1.2
 license: MIT
 url: https://github.com/earbrain/esp-gateway
-dependencies:
-  idf:
-    version: ">=4.4.0"
-  espressif/mdns:
-    version: ">=1.0"
-    rules:
-      - if: "idf_version >=5.0"
