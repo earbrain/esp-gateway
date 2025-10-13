@@ -34,6 +34,15 @@ extern "C" void app_main(void) {
   // Create gateway with options
   earbrain::Gateway gateway(options);
 
+  // Add event listener for WiFi credentials saved event
+  gateway.on(earbrain::Gateway::Event::CredentialsSaved,
+    [](const earbrain::StationConfig& config) {
+      earbrain::logging::infof("gateway_example",
+        "WiFi credentials saved! SSID: %s",
+        config.ssid.c_str());
+    }
+  );
+
   // Apply logging middleware globally to all routes
   gateway.server().use(earbrain::middleware::log_request);
 

@@ -104,6 +104,19 @@ esp_err_t Gateway::stop_portal() {
   return ESP_OK;
 }
 
+void Gateway::on(Event event, EventListener listener) {
+  event_listeners[event].push_back(std::move(listener));
+}
+
+void Gateway::emit(Event event, const StationConfig& config) {
+  auto it = event_listeners.find(event);
+  if (it != event_listeners.end()) {
+    for (const auto& listener : it->second) {
+      listener(config);
+    }
+  }
+}
+
 void Gateway::ensure_builtin_routes() {
   if (builtin_routes_registered) {
     return;
