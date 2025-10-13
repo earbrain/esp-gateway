@@ -4,83 +4,41 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include "nvs.h"
+#include <cstring>
+#include "esp_wifi.h"
 
 namespace earbrain {
 
 namespace {
 
-// NVS keys for WiFi credentials
-constexpr const char wifi_nvs_namespace[] = "wifi";
-constexpr const char wifi_nvs_ssid_key[] = "sta_ssid";
-constexpr const char wifi_nvs_pass_key[] = "sta_pass";
-
 constexpr const char wifi_tag[] = "wifi_credentials";
-
-std::optional<std::string> read_nvs_string(nvs_handle_t handle, const char *key, esp_err_t &err) {
-  size_t len = 0;
-  err = nvs_get_str(handle, key, nullptr, &len);
-
-  if (err == ESP_ERR_NVS_NOT_FOUND) {
-    err = ESP_OK;
-    return std::nullopt;
-  }
-
-  if (err != ESP_OK) {
-    return std::nullopt;
-  }
-
-  if (len <= 1) {
-    err = ESP_OK;
-    return std::nullopt;
-  }
-
-  std::string value;
-  value.resize(len);
-  err = nvs_get_str(handle, key, value.data(), &len);
-
-  if (err != ESP_OK) {
-    return std::nullopt;
-  }
-
-  // Remove trailing null terminator if present
-  if (len > 0 && value[len - 1] == '\0') {
-    value.resize(len - 1);
-  } else {
-    value.resize(len);
-  }
-
-  return value;
-}
 
 } // namespace
 
 esp_err_t WifiCredentialStore::save(std::string_view ssid,
                                     std::string_view passphrase) {
-  nvs_handle_t handle = 0;
-  esp_err_t err = nvs_open(wifi_nvs_namespace, NVS_READWRITE, &handle);
-  if (err != ESP_OK) {
-    return err;
-  }
+  wifi_config_t wifi_config = {};
 
-  std::string ssid_copy(ssid);
-  err = nvs_set_str(handle, wifi_nvs_ssid_key, ssid_copy.c_str());
+  // Copy SSID (max 32 bytes)
+  size_t ssid_len = std::min(ssid.length(), sizeof(wifi_config.sta.ssid) - 1);
+  std::memcpy(wifi_config.sta.ssid, ssid.data(), ssid_len);
+  wifi_config.sta.ssid[ssid_len] = '\0';
 
-  if (err == ESP_OK) {
-    std::string pass_copy(passphrase);
-    err = nvs_set_str(handle, wifi_nvs_pass_key, pass_copy.c_str());
-  }
+  // Copy passphrase (max 64 bytes)
+  size_t pass_len = std::min(passphrase.length(), sizeof(wifi_config.sta.password) - 1);
+  std::memcpy(wifi_config.sta.password, passphrase.data(), pass_len);
+  wifi_config.sta.password[pass_len] = '\0';
 
-  if (err == ESP_OK) {
-    err = nvs_commit(handle);
-  }
-
-  nvs_close(handle);
+  // Set the WiFi configuration which will be stored in NVS
+  esp_err_t err = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
 
   if (err == ESP_OK) {
     saved_config.ssid = std::string(ssid);
     saved_config.passphrase = std::string(passphrase);
     loaded = true;
+    logging::infof(wifi_tag, "Saved Wi-Fi credentials for SSID: %s", saved_config.ssid.c_str());
+  } else {
+    logging::errorf(wifi_tag, "Failed to save Wi-Fi credentials: %s", esp_err_to_name(err));
   }
 
   return err;
@@ -91,44 +49,25 @@ esp_err_t WifiCredentialStore::load() {
     return ESP_OK;
   }
 
-  nvs_handle_t handle = 0;
-  esp_err_t err = nvs_open(wifi_nvs_namespace, NVS_READONLY, &handle);
-  if (err == ESP_ERR_NVS_NOT_FOUND) {
+  wifi_config_t wifi_config = {};
+  esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
+
+  if (err != ESP_OK) {
+    logging::errorf(wifi_tag, "Failed to load Wi-Fi credentials: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  // Check if SSID is empty
+  if (wifi_config.sta.ssid[0] == '\0') {
     saved_config = StationConfig{};
     loaded = true;
     logging::info("No saved Wi-Fi credentials found", wifi_tag);
     return ESP_OK;
   }
-  if (err != ESP_OK) {
-    return err;
-  }
 
-  // Read SSID
-  auto ssid_opt = read_nvs_string(handle, wifi_nvs_ssid_key, err);
-  if (err != ESP_OK) {
-    nvs_close(handle);
-    return err;
-  }
-
-  if (!ssid_opt) {
-    saved_config = StationConfig{};
-    loaded = true;
-    nvs_close(handle);
-    logging::info("No saved Wi-Fi credentials found", wifi_tag);
-    return ESP_OK;
-  }
-
-  // Read passphrase
-  auto pass_opt = read_nvs_string(handle, wifi_nvs_pass_key, err);
-  if (err != ESP_OK) {
-    nvs_close(handle);
-    return err;
-  }
-
-  nvs_close(handle);
-
-  saved_config.ssid = std::move(*ssid_opt);
-  saved_config.passphrase = pass_opt ? std::move(*pass_opt) : std::string{};
+  // Convert to C++ strings
+  saved_config.ssid = std::string(reinterpret_cast<const char*>(wifi_config.sta.ssid));
+  saved_config.passphrase = std::string(reinterpret_cast<const char*>(wifi_config.sta.password));
   loaded = true;
 
   logging::infof(wifi_tag, "Loaded saved Wi-Fi credentials for SSID: %s",
