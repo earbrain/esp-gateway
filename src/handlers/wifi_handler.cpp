@@ -96,7 +96,7 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
   logging::info("Wi-Fi credentials saved successfully", "gateway");
 
   // Emit credentials saved event
-  gateway->emit(Gateway::Event::CredentialsSaved, station_cfg);
+  gateway->emit(Gateway::Event::WifiCredentialsSaved, station_cfg);
 
   return http::send_success(req);
 }
@@ -109,9 +109,20 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
 
   logging::info("Attempting to connect using saved credentials", "gateway");
 
+  // Get saved credentials for event emission
+  auto saved_config = gateway->wifi().credentials().get();
+  StationConfig station_cfg{};
+  if (saved_config.has_value()) {
+    station_cfg = saved_config.value();
+  }
+
   const esp_err_t result = gateway->wifi().connect();
   if (result == ESP_OK) {
     logging::info("Successfully connected to saved network", "gateway");
+
+    // Emit connect success event
+    gateway->emit(Gateway::Event::WifiConnectSuccess, station_cfg);
+
     return http::send_success(req);
   }
 
@@ -138,6 +149,10 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
   }
 
   logging::errorf("gateway", "Connection failed: %s", esp_err_to_name(result));
+
+  // Emit connect failed event
+  gateway->emit(Gateway::Event::WifiConnectFailed, station_cfg);
+
   return http::send_error(req, error_msg, esp_err_to_name(result));
 }
 

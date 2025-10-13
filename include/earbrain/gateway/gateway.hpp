@@ -22,7 +22,9 @@ struct GatewayOptions {
 class Gateway {
 public:
   enum class Event {
-    CredentialsSaved,
+    WifiCredentialsSaved,
+    WifiConnectSuccess,
+    WifiConnectFailed,
   };
 
   using EventListener = std::function<void(const StationConfig&)>;

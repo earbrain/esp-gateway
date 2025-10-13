@@ -34,11 +34,27 @@ extern "C" void app_main(void) {
   // Create gateway with options
   earbrain::Gateway gateway(options);
 
-  // Add event listener for WiFi credentials saved event
-  gateway.on(earbrain::Gateway::Event::CredentialsSaved,
+  // Add event listeners for WiFi events
+  gateway.on(earbrain::Gateway::Event::WifiCredentialsSaved,
     [](const earbrain::StationConfig& config) {
       earbrain::logging::infof("gateway_example",
         "WiFi credentials saved! SSID: %s",
+        config.ssid.c_str());
+    }
+  );
+
+  gateway.on(earbrain::Gateway::Event::WifiConnectSuccess,
+    [](const earbrain::StationConfig& config) {
+      earbrain::logging::infof("gateway_example",
+        "WiFi connection successful! SSID: %s",
+        config.ssid.c_str());
+    }
+  );
+
+  gateway.on(earbrain::Gateway::Event::WifiConnectFailed,
+    [](const earbrain::StationConfig& config) {
+      earbrain::logging::errorf("gateway_example",
+        "WiFi connection failed! SSID: %s",
         config.ssid.c_str());
     }
   );
