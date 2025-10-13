@@ -84,8 +84,7 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
                  "Received Wi-Fi credentials update for SSID='%s' (len=%zu)",
                  station_cfg.ssid.c_str(), station_cfg.ssid.size());
 
-  const esp_err_t result =
-      gateway->wifi().credentials().save(station_cfg.ssid, station_cfg.passphrase);
+  const esp_err_t result = gateway->wifi().save_credentials(station_cfg.ssid, station_cfg.passphrase);
   if (result != ESP_OK) {
     logging::errorf("gateway", "Failed to save Wi-Fi credentials: %s",
                     esp_err_to_name(result));
@@ -110,7 +109,7 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
   logging::info("Attempting to connect using saved credentials", "gateway");
 
   // Get saved credentials for event emission
-  auto saved_config = gateway->wifi().credentials().get();
+  auto saved_config = gateway->wifi().load_credentials();
   StationConfig station_cfg{};
   if (saved_config.has_value()) {
     station_cfg = saved_config.value();

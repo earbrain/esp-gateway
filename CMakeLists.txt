@@ -25,7 +25,6 @@ idf_component_register(
         "src/middlewares/logging.cpp"
         "src/validation.cpp"
         "src/wifi_service.cpp"
-        "src/wifi_credentials.cpp"
         ${PORTAL_EMBED_SOURCES}
     INCLUDE_DIRS
         "include"

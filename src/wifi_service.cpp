@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -96,7 +97,7 @@ WifiService::WifiService()
     initialized(false), handlers_registered(false), sta_connected(false),
     sta_retry_count(0), sta_manual_disconnect(false), sta_ip{},
     sta_last_disconnect_reason(WIFI_REASON_UNSPECIFIED),
-    sta_last_error(ESP_OK), credentials_store{} {
+    sta_last_error(ESP_OK) {
 }
 
 esp_err_t WifiService::ensure_initialized() {
@@ -360,6 +361,67 @@ esp_err_t WifiService::connect(const StationConfig &config) {
   return ESP_ERR_TIMEOUT;
 }
 
+esp_err_t WifiService::save_credentials(std::string_view ssid, std::string_view passphrase) {
+  wifi_config_t wifi_config = {};
+
+  // Copy SSID (max 32 bytes)
+  size_t ssid_len = std::min(ssid.length(), sizeof(wifi_config.sta.ssid) - 1);
+  std::memcpy(wifi_config.sta.ssid, ssid.data(), ssid_len);
+  wifi_config.sta.ssid[ssid_len] = '\0';
+
+  // Copy passphrase (max 64 bytes)
+  size_t pass_len = std::min(passphrase.length(), sizeof(wifi_config.sta.password) - 1);
+  std::memcpy(wifi_config.sta.password, passphrase.data(), pass_len);
+  wifi_config.sta.password[pass_len] = '\0';
+
+  // Set the WiFi configuration which will be stored in NVS
+  esp_err_t err = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+
+  if (err == ESP_OK) {
+    // Cache the credentials
+    credentials = StationConfig{
+      .ssid = std::string(ssid),
+      .passphrase = std::string(passphrase)
+    };
+    logging::infof(wifi_tag, "Saved Wi-Fi credentials for SSID: %s", std::string(ssid).c_str());
+  } else {
+    logging::errorf(wifi_tag, "Failed to save Wi-Fi credentials: %s", esp_err_to_name(err));
+  }
+
+  return err;
+}
+
+std::optional<StationConfig> WifiService::load_credentials() {
+  if (credentials.has_value()) {
+    return credentials;
+  }
+
+  // Load from NVS
+  wifi_config_t wifi_config = {};
+  esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
+
+  if (err != ESP_OK) {
+    logging::errorf(wifi_tag, "Failed to load Wi-Fi credentials: %s", esp_err_to_name(err));
+    return std::nullopt;
+  }
+
+  // Check if SSID is empty
+  if (wifi_config.sta.ssid[0] == '\0') {
+    logging::info("No saved Wi-Fi credentials found", wifi_tag);
+    return std::nullopt;
+  }
+
+  // Convert to StationConfig and cache it
+  StationConfig config;
+  config.ssid = std::string(reinterpret_cast<const char*>(wifi_config.sta.ssid));
+  config.passphrase = std::string(reinterpret_cast<const char*>(wifi_config.sta.password));
+
+  credentials = config;
+  logging::infof(wifi_tag, "Loaded saved Wi-Fi credentials for SSID: %s", config.ssid.c_str());
+
+  return config;
+}
+
 esp_err_t WifiService::connect() {
   esp_err_t err = ensure_initialized();
   if (err != ESP_OK) {
@@ -367,14 +429,14 @@ esp_err_t WifiService::connect() {
     return err;
   }
 
-  auto saved_credentials = credentials_store.get();
-  if (!saved_credentials.has_value()) {
+  auto saved_config = load_credentials();
+  if (!saved_config.has_value()) {
     sta_last_error = ESP_ERR_NOT_FOUND;
     logging::warn("No saved credentials found", wifi_tag);
     return ESP_ERR_NOT_FOUND;
   }
 
-  return connect(saved_credentials.value());
+  return connect(saved_config.value());
 }
 
 void WifiService::ip_event_handler(void *arg, esp_event_base_t event_base,
