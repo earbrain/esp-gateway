@@ -25,10 +25,12 @@ const char *chip_model_string(const esp_chip_info_t &info) {
     return "ESP32-S3";
   case CHIP_ESP32C3:
     return "ESP32-C3";
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   case CHIP_ESP32C2:
     return "ESP32-C2";
   case CHIP_ESP32C6:
     return "ESP32-C6";
+#endif
   case CHIP_ESP32H2:
     return "ESP32-H2";
   default:

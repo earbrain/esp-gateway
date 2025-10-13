@@ -59,8 +59,10 @@ wifi_config_t make_ap_config(const AccessPointConfig &config) {
   cfg.ap.channel = config.channel;
   cfg.ap.authmode = config.auth_mode;
   cfg.ap.max_connection = config.max_connections;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   cfg.ap.pmf_cfg.capable = true;
   cfg.ap.pmf_cfg.required = false;
+#endif
   return cfg;
 }
 
@@ -78,8 +80,10 @@ wifi_config_t make_sta_config(const StationConfig &config) {
   cfg.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
   cfg.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
   cfg.sta.listen_interval = sta_listen_interval;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   cfg.sta.pmf_cfg.capable = true;
   cfg.sta.pmf_cfg.required = false;
+#endif
   cfg.sta.threshold.authmode =
       config.passphrase.empty() ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA2_PSK;
   return cfg;

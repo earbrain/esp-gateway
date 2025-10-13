@@ -25,8 +25,10 @@ inline std::string auth_mode_to_string(wifi_auth_mode_t mode) {
     return "WPA2/WPA3";
   case WIFI_AUTH_WAPI_PSK:
     return "WAPI";
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   case WIFI_AUTH_OWE:
     return "OWE";
+#endif
   default:
     return "Unknown";
   }
