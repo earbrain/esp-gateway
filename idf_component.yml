@@ -2,6 +2,3 @@ name: esp_gateway
 version: 0.1.4
 license: MIT
 url: https://github.com/earbrain/esp-gateway
-files:
-  include:
-    - "portal/dist/**/*"

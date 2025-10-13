@@ -17,6 +17,9 @@ build/
 compile_commands.json
 **/node_modules/
 
+# Portal build outputs (use pre-generated .S files in portal_assets/ instead)
+portal/dist/
+
 # Auto-generated lock files
 dependencies.lock
 
