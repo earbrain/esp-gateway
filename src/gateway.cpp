@@ -24,20 +24,18 @@ constexpr const char gateway_tag[] = "gateway";
 
 Gateway::Gateway()
   : options{},
-    wifi_service{},
     http_server{},
-    mdns_service{},
     builtin_routes_registered(false) {
 }
 
 Gateway::Gateway(const GatewayOptions &opts)
-  : options{opts}, wifi_service{}, http_server{}, mdns_service{opts.mdns_config},
+  : options{opts}, http_server{},
     builtin_routes_registered(false) {
 }
 
 Gateway::~Gateway() {
   http_server.stop();
-  mdns_service.stop();
+  earbrain::mdns().stop();
 }
 
 esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
@@ -56,7 +54,7 @@ esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
 }
 
 esp_err_t Gateway::start_portal() {
-  esp_err_t err = wifi_service.start_access_point(options.ap_config);
+  esp_err_t err = earbrain::wifi().start_access_point(options.ap_config);
   if (err != ESP_OK) {
     logging::errorf(gateway_tag, "Failed to start access point: %s", esp_err_to_name(err));
     return err;
@@ -67,11 +65,11 @@ esp_err_t Gateway::start_portal() {
   err = http_server.start();
   if (err != ESP_OK) {
     logging::errorf(gateway_tag, "Failed to start HTTP server: %s", esp_err_to_name(err));
-    wifi_service.stop_access_point();
+    earbrain::wifi().stop_access_point();
     return err;
   }
 
-  err = mdns_service.start();
+  err = earbrain::mdns().start(options.mdns_config);
   if (err != ESP_OK) {
     logging::warnf(gateway_tag, "Failed to start mDNS service: %s", esp_err_to_name(err));
   }
@@ -81,7 +79,7 @@ esp_err_t Gateway::start_portal() {
 }
 
 esp_err_t Gateway::stop_portal() {
-  esp_err_t mdns_err = mdns_service.stop();
+  esp_err_t mdns_err = earbrain::mdns().stop();
   if (mdns_err != ESP_OK) {
     logging::warnf(gateway_tag, "Failed to stop mDNS service: %s", esp_err_to_name(mdns_err));
   }
@@ -91,7 +89,7 @@ esp_err_t Gateway::stop_portal() {
     logging::errorf(gateway_tag, "Failed to stop HTTP server: %s", esp_err_to_name(http_err));
   }
 
-  esp_err_t wifi_err = wifi_service.stop_access_point();
+  esp_err_t wifi_err = earbrain::wifi().stop_access_point();
   if (wifi_err != ESP_OK) {
     logging::errorf(gateway_tag, "Failed to stop access point: %s", esp_err_to_name(wifi_err));
   }

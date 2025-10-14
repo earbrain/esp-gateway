@@ -32,9 +32,6 @@ public:
   Gateway(const GatewayOptions &options);
   ~Gateway();
 
-  WifiService &wifi() { return wifi_service; }
-  MdnsService &mdns() { return mdns_service; }
-
   HttpServer &server() {
     ensure_builtin_routes();
     return http_server;
@@ -63,9 +60,7 @@ private:
   void ensure_builtin_routes();
 
   GatewayOptions options;
-  WifiService wifi_service;
   HttpServer http_server;
-  MdnsService mdns_service;
   bool builtin_routes_registered;
   std::map<Event, std::vector<EventListener>> event_listeners;
 };

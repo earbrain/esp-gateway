@@ -2,6 +2,7 @@
 
 #include "esp_http_server.h"
 #include "earbrain/gateway/gateway.hpp"
+#include "earbrain/wifi_service.hpp"
 #include "json/http_response.hpp"
 #include <string>
 
@@ -30,7 +31,7 @@ inline std::string get_connection_type(httpd_req_t *req, Gateway *gateway) {
     return "unknown";
   }
 
-  WifiStatus status = gateway->wifi().status();
+  WifiStatus status = earbrain::wifi().status();
 
   if (status.sta_active) {
     return "sta";

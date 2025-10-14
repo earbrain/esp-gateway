@@ -11,6 +11,7 @@
 #include "earbrain/gateway/handlers/handler_helpers.hpp"
 #include "earbrain/logging.hpp"
 #include "earbrain/validation.hpp"
+#include "earbrain/wifi_service.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 #include "json/wifi_credentials.hpp"
@@ -84,7 +85,7 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
                  "Received Wi-Fi credentials update for SSID='%s' (len=%zu)",
                  station_cfg.ssid.c_str(), station_cfg.ssid.size());
 
-  const esp_err_t result = gateway->wifi().save_credentials(station_cfg.ssid, station_cfg.passphrase);
+  const esp_err_t result = earbrain::wifi().save_credentials(station_cfg.ssid, station_cfg.passphrase);
   if (result != ESP_OK) {
     logging::errorf("gateway", "Failed to save Wi-Fi credentials: %s",
                     esp_err_to_name(result));
@@ -109,13 +110,13 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
   logging::info("Attempting to connect using saved credentials", "gateway");
 
   // Get saved credentials for event emission
-  auto saved_config = gateway->wifi().load_credentials();
+  auto saved_config = earbrain::wifi().load_credentials();
   StationConfig station_cfg{};
   if (saved_config.has_value()) {
     station_cfg = saved_config.value();
   }
 
-  const esp_err_t result = gateway->wifi().connect();
+  const esp_err_t result = earbrain::wifi().connect();
   if (result == ESP_OK) {
     logging::info("Successfully connected to saved network", "gateway");
 
@@ -161,7 +162,7 @@ esp_err_t handle_status_get(httpd_req_t *req) {
     return ESP_FAIL;
   }
 
-  WifiStatus wifi_status = gateway->wifi().status();
+  WifiStatus wifi_status = earbrain::wifi().status();
 
   json_model::WifiStatus status;
   status.ap_active = wifi_status.ap_active;
@@ -190,7 +191,7 @@ esp_err_t handle_scan_get(httpd_req_t *req) {
     return ESP_FAIL;
   }
 
-  WifiScanResult result = gateway->wifi().perform_scan();
+  WifiScanResult result = earbrain::wifi().perform_scan();
 
   if (result.error != ESP_OK) {
     return http::send_error(req, "Wi-Fi scan failed", esp_err_to_name(result.error));
