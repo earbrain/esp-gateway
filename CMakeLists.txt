@@ -20,11 +20,7 @@ idf_component_register(
         "src/handlers/portal_handler.cpp"
         "src/handlers/wifi_handler.cpp"
         "src/http_server.cpp"
-        "src/logging.cpp"
-        "src/mdns_service.cpp"
         "src/middlewares/logging.cpp"
-        "src/validation.cpp"
-        "src/wifi_service.cpp"
         ${PORTAL_EMBED_SOURCES}
     INCLUDE_DIRS
         "include"
@@ -34,6 +30,7 @@ idf_component_register(
         esp_http_server
         json
         esp_wifi
+        earbrain_core
     PRIV_REQUIRES
         esp_netif
         esp_event

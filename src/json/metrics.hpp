@@ -1,6 +1,6 @@
 #pragma once
 
-#include "earbrain/gateway/metrics.hpp"
+#include "earbrain/metrics.hpp"
 #include "json/json_helpers.hpp"
 
 #include <cJSON.h>

@@ -1,7 +1,7 @@
 #include "earbrain/gateway/gateway.hpp"
 #include "earbrain/gateway/middlewares/logging.hpp"
 #include "esp_err.h"
-#include "earbrain/gateway/logging.hpp"
+#include "earbrain/logging.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 

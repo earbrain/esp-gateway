@@ -10,7 +10,7 @@
 #include "earbrain/gateway/handlers/mdns_handler.hpp"
 #include "earbrain/gateway/handlers/portal_handler.hpp"
 #include "earbrain/gateway/handlers/wifi_handler.hpp"
-#include "earbrain/gateway/logging.hpp"
+#include "earbrain/logging.hpp"
 
 namespace earbrain {
 

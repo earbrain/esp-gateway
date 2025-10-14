@@ -36,7 +36,7 @@ idf.py build flash monitor
 ## Example
 ```cpp
 #include "earbrain/gateway/gateway.hpp"
-#include "earbrain/gateway/logging.hpp"
+#include "earbrain/logging.hpp"
 
 extern "C" void app_main(void) {
   static const char *TAG = "my_gateway";

@@ -7,7 +7,7 @@
 #include <string>
 #include <utility>
 
-#include "earbrain/gateway/logging.hpp"
+#include "earbrain/logging.hpp"
 #include "json/http_response.hpp"
 #include "json/log_entries.hpp"
 

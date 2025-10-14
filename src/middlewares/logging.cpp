@@ -1,6 +1,6 @@
 #include "earbrain/gateway/middlewares/logging.hpp"
 
-#include "earbrain/gateway/logging.hpp"
+#include "earbrain/logging.hpp"
 #include "esp_timer.h"
 #include <cstring>
 

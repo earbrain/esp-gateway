@@ -1,6 +1,6 @@
 #pragma once
 
-#include "earbrain/gateway/logging.hpp"
+#include "earbrain/logging.hpp"
 #include "json/json_helpers.hpp"
 #include "esp_log.h"
 

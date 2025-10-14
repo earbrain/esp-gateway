@@ -1,7 +1,7 @@
 #pragma once
 
 #include "json/json_helpers.hpp"
-#include "earbrain/gateway/wifi_service.hpp"
+#include "earbrain/wifi_service.hpp"
 
 #include <string>
 #include <utility>

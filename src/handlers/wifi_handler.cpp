@@ -9,8 +9,8 @@
 
 #include "earbrain/gateway/gateway.hpp"
 #include "earbrain/gateway/handlers/handler_helpers.hpp"
-#include "earbrain/gateway/logging.hpp"
-#include "earbrain/gateway/validation.hpp"
+#include "earbrain/logging.hpp"
+#include "earbrain/validation.hpp"
 #include "json/http_response.hpp"
 #include "json/json_helpers.hpp"
 #include "json/wifi_credentials.hpp"

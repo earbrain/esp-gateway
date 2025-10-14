@@ -2,7 +2,7 @@
 
 #include <utility>
 
-#include "earbrain/gateway/metrics.hpp"
+#include "earbrain/metrics.hpp"
 #include "json/http_response.hpp"
 #include "json/metrics.hpp"
 #include "esp_heap_caps.h"

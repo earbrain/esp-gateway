@@ -1,8 +1,8 @@
 #pragma once
 
 #include "earbrain/gateway/http_server.hpp"
-#include "earbrain/gateway/mdns_service.hpp"
-#include "earbrain/gateway/wifi_service.hpp"
+#include "earbrain/mdns_service.hpp"
+#include "earbrain/wifi_service.hpp"
 
 #include "esp_err.h"
 #include "esp_http_server.h"
