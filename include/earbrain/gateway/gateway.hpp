@@ -26,7 +26,7 @@ public:
     WifiConnectFailed,
   };
 
-  using EventListener = std::function<void(const StationConfig&)>;
+  using EventListener = std::function<void(const WifiCredentials&)>;
 
   Gateway();
   Gateway(const GatewayOptions &options);
@@ -46,7 +46,7 @@ public:
   esp_err_t stop_portal();
 
   void on(Event event, EventListener listener);
-  void emit(Event event, const StationConfig& config);
+  void emit(Event event, const WifiCredentials& credentials);
 
   static const char *version() {
 #ifdef GATEWAY_VERSION

@@ -61,9 +61,9 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
     return http::send_fail(req, "Invalid JSON body.");
   }
 
-  StationConfig station_cfg{};
+  WifiCredentials wifi_creds{};
   const char *bad_field = nullptr;
-  if (!json_model::parse_station_config(root.get(), station_cfg, &bad_field)) {
+  if (!json_model::parse_wifi_credentials(root.get(), wifi_creds, &bad_field)) {
     std::string message = bad_field
                             ? std::string(bad_field) + " must be a string."
                             : "Invalid credentials payload.";
@@ -71,21 +71,21 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
                                  message.c_str());
   }
 
-  if (!validation::is_valid_ssid(station_cfg.ssid)) {
+  if (!validation::is_valid_ssid(wifi_creds.ssid)) {
     return http::send_fail_field(req, "ssid",
                                  "ssid must be 1-32 characters.");
   }
 
-  if (!validation::is_valid_passphrase(station_cfg.passphrase)) {
+  if (!validation::is_valid_passphrase(wifi_creds.passphrase)) {
     return http::send_fail_field(req, "passphrase",
                                  "Passphrase must be 8-63 chars or 64 hex.");
   }
 
   logging::infof("gateway",
                  "Received Wi-Fi credentials update for SSID='%s' (len=%zu)",
-                 station_cfg.ssid.c_str(), station_cfg.ssid.size());
+                 wifi_creds.ssid.c_str(), wifi_creds.ssid.size());
 
-  const esp_err_t result = earbrain::wifi().save_credentials(station_cfg.ssid, station_cfg.passphrase);
+  const esp_err_t result = earbrain::wifi().save_credentials(wifi_creds.ssid, wifi_creds.passphrase);
   if (result != ESP_OK) {
     logging::errorf("gateway", "Failed to save Wi-Fi credentials: %s",
                     esp_err_to_name(result));
@@ -96,7 +96,7 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
   logging::info("Wi-Fi credentials saved successfully", "gateway");
 
   // Emit credentials saved event
-  gateway->emit(Gateway::Event::WifiCredentialsSaved, station_cfg);
+  gateway->emit(Gateway::Event::WifiCredentialsSaved, wifi_creds);
 
   return http::send_success(req);
 }
@@ -110,10 +110,10 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
   logging::info("Attempting to connect using saved credentials", "gateway");
 
   // Get saved credentials for event emission
-  auto saved_config = earbrain::wifi().load_credentials();
-  StationConfig station_cfg{};
-  if (saved_config.has_value()) {
-    station_cfg = saved_config.value();
+  auto saved_creds = earbrain::wifi().load_credentials();
+  WifiCredentials wifi_creds{};
+  if (saved_creds.has_value()) {
+    wifi_creds = saved_creds.value();
   }
 
   const esp_err_t result = earbrain::wifi().connect();
@@ -121,7 +121,7 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
     logging::info("Successfully connected to saved network", "gateway");
 
     // Emit connect success event
-    gateway->emit(Gateway::Event::WifiConnectSuccess, station_cfg);
+    gateway->emit(Gateway::Event::WifiConnectSuccess, wifi_creds);
 
     return http::send_success(req);
   }
@@ -151,7 +151,7 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
   logging::errorf("gateway", "Connection failed: %s", esp_err_to_name(result));
 
   // Emit connect failed event
-  gateway->emit(Gateway::Event::WifiConnectFailed, station_cfg);
+  gateway->emit(Gateway::Event::WifiConnectFailed, wifi_creds);
 
   return http::send_error(req, error_msg, esp_err_to_name(result));
 }
@@ -162,12 +162,14 @@ esp_err_t handle_status_get(httpd_req_t *req) {
     return ESP_FAIL;
   }
 
-  WifiStatus wifi_status = earbrain::wifi().status();
+  earbrain::WifiStatus wifi_status = earbrain::wifi().status();
 
   json_model::WifiStatus status;
-  status.ap_active = wifi_status.ap_active;
-  status.sta_active = wifi_status.sta_active;
+  // Map WifiMode to ap_active and sta_active for backward compatibility
+  status.ap_active = (wifi_status.mode == WifiMode::AP || wifi_status.mode == WifiMode::APSTA);
+  status.sta_active = (wifi_status.mode == WifiMode::STA || wifi_status.mode == WifiMode::APSTA);
   status.sta_connected = wifi_status.sta_connected;
+  status.sta_connecting = wifi_status.sta_connecting;
   status.last_error = wifi_status.sta_last_error;
   status.disconnect_reason = wifi_status.sta_last_disconnect_reason;
 

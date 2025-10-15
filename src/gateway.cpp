@@ -54,9 +54,19 @@ esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
 }
 
 esp_err_t Gateway::start_portal() {
-  esp_err_t err = earbrain::wifi().start_access_point(options.ap_config);
+  // Configure WiFi with AP settings
+  WifiConfig wifi_config;
+  wifi_config.ap_config = options.ap_config;
+  esp_err_t err = earbrain::wifi().config(wifi_config);
   if (err != ESP_OK) {
-    logging::errorf(gateway_tag, "Failed to start access point: %s", esp_err_to_name(err));
+    logging::errorf(gateway_tag, "Failed to configure WiFi: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  // Start WiFi in APSTA mode (AP + STA)
+  err = earbrain::wifi().mode(WifiMode::APSTA);
+  if (err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to start WiFi in APSTA mode: %s", esp_err_to_name(err));
     return err;
   }
 
@@ -65,7 +75,7 @@ esp_err_t Gateway::start_portal() {
   err = http_server.start();
   if (err != ESP_OK) {
     logging::errorf(gateway_tag, "Failed to start HTTP server: %s", esp_err_to_name(err));
-    earbrain::wifi().stop_access_point();
+    earbrain::wifi().mode(WifiMode::Off);
     return err;
   }
 
@@ -89,9 +99,9 @@ esp_err_t Gateway::stop_portal() {
     logging::errorf(gateway_tag, "Failed to stop HTTP server: %s", esp_err_to_name(http_err));
   }
 
-  esp_err_t wifi_err = earbrain::wifi().stop_access_point();
+  esp_err_t wifi_err = earbrain::wifi().mode(WifiMode::Off);
   if (wifi_err != ESP_OK) {
-    logging::errorf(gateway_tag, "Failed to stop access point: %s", esp_err_to_name(wifi_err));
+    logging::errorf(gateway_tag, "Failed to stop WiFi: %s", esp_err_to_name(wifi_err));
   }
 
   if (http_err != ESP_OK || wifi_err != ESP_OK) {
@@ -106,11 +116,11 @@ void Gateway::on(Event event, EventListener listener) {
   event_listeners[event].push_back(std::move(listener));
 }
 
-void Gateway::emit(Event event, const StationConfig& config) {
+void Gateway::emit(Event event, const WifiCredentials& credentials) {
   auto it = event_listeners.find(event);
   if (it != event_listeners.end()) {
     for (const auto& listener : it->second) {
-      listener(config);
+      listener(credentials);
     }
   }
 }

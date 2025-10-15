@@ -36,26 +36,26 @@ extern "C" void app_main(void) {
 
   // Add event listeners for WiFi events
   gateway.on(earbrain::Gateway::Event::WifiCredentialsSaved,
-    [](const earbrain::StationConfig& config) {
+    [](const earbrain::WifiCredentials& credentials) {
       earbrain::logging::infof("gateway_example",
         "WiFi credentials saved! SSID: %s",
-        config.ssid.c_str());
+        credentials.ssid.c_str());
     }
   );
 
   gateway.on(earbrain::Gateway::Event::WifiConnectSuccess,
-    [](const earbrain::StationConfig& config) {
+    [](const earbrain::WifiCredentials& credentials) {
       earbrain::logging::infof("gateway_example",
         "WiFi connection successful! SSID: %s",
-        config.ssid.c_str());
+        credentials.ssid.c_str());
     }
   );
 
   gateway.on(earbrain::Gateway::Event::WifiConnectFailed,
-    [](const earbrain::StationConfig& config) {
+    [](const earbrain::WifiCredentials& credentials) {
       earbrain::logging::errorf("gateway_example",
         "WiFi connection failed! SSID: %s",
-        config.ssid.c_str());
+        credentials.ssid.c_str());
     }
   );
 

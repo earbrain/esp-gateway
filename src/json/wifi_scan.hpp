@@ -1,7 +1,7 @@
 #pragma once
 
 #include "json/json_helpers.hpp"
-#include "earbrain/wifi_scan.hpp"
+#include "earbrain/wifi_service.hpp"
 
 namespace earbrain::json_model {
 

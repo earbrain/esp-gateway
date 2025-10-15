@@ -33,11 +33,12 @@ inline std::string get_connection_type(httpd_req_t *req, Gateway *gateway) {
 
   WifiStatus status = earbrain::wifi().status();
 
-  if (status.sta_active) {
+  // Check WiFi mode and determine connection type
+  if (status.mode == WifiMode::STA || status.mode == WifiMode::APSTA) {
     return "sta";
   }
 
-  if (status.ap_active) {
+  if (status.mode == WifiMode::AP) {
     return "ap";
   }
 

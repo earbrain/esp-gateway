@@ -13,6 +13,7 @@ struct WifiStatus {
   bool ap_active = false;
   bool sta_active = false;
   bool sta_connected = false;
+  bool sta_connecting = false;
   std::string ip;
   wifi_err_reason_t disconnect_reason = WIFI_REASON_UNSPECIFIED;
   esp_err_t last_error = ESP_OK;
@@ -52,6 +53,9 @@ inline json::Ptr to_json(const WifiStatus &status) {
     return nullptr;
   }
   if (add_bool("sta_connected", status.sta_connected) != ESP_OK) {
+    return nullptr;
+  }
+  if (add_bool("sta_connecting", status.sta_connecting) != ESP_OK) {
     return nullptr;
   }
 
