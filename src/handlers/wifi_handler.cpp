@@ -116,13 +116,11 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
     wifi_creds = saved_creds.value();
   }
 
-  const esp_err_t result = earbrain::wifi().connect();
+  // Use connect_sync for synchronous connection (with 15 second timeout)
+  const esp_err_t result = earbrain::wifi().connect_sync();
   if (result == ESP_OK) {
     logging::info("Successfully connected to saved network", "gateway");
-
-    // Emit connect success event
     gateway->emit(Gateway::Event::WifiConnectSuccess, wifi_creds);
-
     return http::send_success(req);
   }
 
@@ -149,10 +147,7 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
   }
 
   logging::errorf("gateway", "Connection failed: %s", esp_err_to_name(result));
-
-  // Emit connect failed event
   gateway->emit(Gateway::Event::WifiConnectFailed, wifi_creds);
-
   return http::send_error(req, error_msg, esp_err_to_name(result));
 }
 
