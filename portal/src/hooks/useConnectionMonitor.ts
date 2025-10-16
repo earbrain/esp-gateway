@@ -10,10 +10,16 @@ export type UseConnectionMonitorOptions = {
   mockMode?: boolean;
 };
 
-type HealthResponse = {
+type HealthData = {
   status: string;
   uptime: number;
   version: string;
+};
+
+type ApiResponse<T> = {
+  status: "success" | "fail" | "error";
+  data: T;
+  error: string | null;
 };
 
 export type UseConnectionMonitorState = {
@@ -60,8 +66,12 @@ export function useConnectionMonitor(
         throw new Error(`Health check failed: ${response.status}`);
       }
 
-      const data = (await response.json()) as HealthResponse;
-      if (data.status !== "ok") {
+      const result = (await response.json()) as ApiResponse<HealthData>;
+      if (result.status !== "success") {
+        throw new Error(`Health check failed: ${result.status}`);
+      }
+
+      if (result.data.status !== "ok") {
         throw new Error("Health check returned non-ok status");
       }
 

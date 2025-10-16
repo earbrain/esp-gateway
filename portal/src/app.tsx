@@ -111,8 +111,8 @@ export function App() {
   // Monitor connection to gateway
   const { status, consecutiveFailures, shouldShowDialog } = useConnectionMonitor({
     endpoint: "/health",
-    intervalMs: 5000,
-    failureThreshold: 5, // Show dialog after 5 consecutive failures (25 seconds)
+    intervalMs: 10000,
+    failureThreshold: 2, // Show dialog after 2 consecutive failures (20 seconds)
     enabled: true,
     mockMode,
   });
