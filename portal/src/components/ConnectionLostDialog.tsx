@@ -3,13 +3,11 @@ import { useTranslation } from "../i18n/context";
 
 type ConnectionLostDialogProps = {
   isOpen: boolean;
-  consecutiveFailures: number;
   onDismiss?: () => void;
 };
 
 export function ConnectionLostDialog({
   isOpen,
-  consecutiveFailures,
   onDismiss,
 }: ConnectionLostDialogProps) {
   const t = useTranslation();
@@ -89,9 +87,7 @@ export function ConnectionLostDialog({
                 <div class="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
               </div>
               <span>
-                {t("connection.lost.reconnecting", {
-                  count: consecutiveFailures.toString(),
-                })}
+                {t("connection.lost.reconnecting")}
               </span>
             </div>
           </div>

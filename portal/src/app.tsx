@@ -167,7 +167,6 @@ export function App() {
     <div class="min-h-screen bg-slate-100 text-slate-900">
       <ConnectionLostDialog
         isOpen={shouldShowDialog && !userDismissed}
-        consecutiveFailures={consecutiveFailures}
         onDismiss={() => setUserDismissed(true)}
       />
       <header class="bg-white/95 shadow-sm">

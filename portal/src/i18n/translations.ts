@@ -102,6 +102,7 @@ const en = {
   "wifi.status.fields.lastError": "Last Error",
   "wifi.config.title": "Wi-Fi Configuration",
   "wifi.config.description": "Enter your Wi-Fi credentials or scan for nearby networks.",
+  "wifi.config.note.scanFirst": "Scan for nearby networks",
   "wifi.config.networkLabel": "Network (SSID)",
   "wifi.config.networkPlaceholder": "Enter SSID",
   "wifi.config.scan": "Scan",
@@ -150,8 +151,8 @@ const en = {
   "language.option.en": "English",
   "language.option.ja": "日本語",
   "connection.lost.title": "Connection Lost",
-  "connection.lost.description": "The device is no longer accessible. The connection may have been interrupted or the device may have been disconnected from the network.",
-  "connection.lost.reconnecting": "Attempting to reconnect... ({{count}} failed attempts)",
+  "connection.lost.description": "The device is no longer accessible. Please check if the access point network is still connected.",
+  "connection.lost.reconnecting": "Attempting to reconnect...",
 } as const;
 
 const ja: typeof en = {
@@ -256,7 +257,8 @@ const ja: typeof en = {
   "wifi.status.fields.lastError": "最後のエラー",
   "wifi.config.title": "Wi-Fi 設定",
   "wifi.config.description":
-    "Wi-Fi 認証情報を入力するか、近隣のネットワークをスキャンしてください。",
+    "Wi-Fi 認証情報を入力するか、近くのネットワークをスキャンしてください。",
+  "wifi.config.note.scanFirst": "近くのネットワークをスキャン",
   "wifi.config.networkLabel": "ネットワーク (SSID)",
   "wifi.config.networkPlaceholder": "SSID を入力",
   "wifi.config.scan": "スキャン",
@@ -305,8 +307,8 @@ const ja: typeof en = {
   "language.option.en": "English",
   "language.option.ja": "日本語",
   "connection.lost.title": "接続が切断されました",
-  "connection.lost.description": "デバイスにアクセスできなくなりました。接続が中断されたか、デバイスがネットワークから切断された可能性があります。",
-  "connection.lost.reconnecting": "再接続を試みています... (失敗回数: {{count}})",
+  "connection.lost.description": "デバイスにアクセスできなくなりました。アクセスポイントのネットワークが接続されているか確認してください。",
+  "connection.lost.reconnecting": "再接続を試みています...",
 } as const;
 
 export type TranslationKey = keyof typeof en;
