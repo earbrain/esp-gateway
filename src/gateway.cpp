@@ -54,10 +54,24 @@ esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
 }
 
 esp_err_t Gateway::start_portal() {
+  // Initialize WiFi service
+  esp_err_t err = earbrain::wifi().initialize();
+  if (err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to initialize WiFi: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  // Initialize mDNS service
+  err = earbrain::mdns().initialize();
+  if (err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to initialize mDNS: %s", esp_err_to_name(err));
+    return err;
+  }
+
   // Configure WiFi with AP settings
   WifiConfig wifi_config;
   wifi_config.ap_config = options.ap_config;
-  esp_err_t err = earbrain::wifi().config(wifi_config);
+  err = earbrain::wifi().config(wifi_config);
   if (err != ESP_OK) {
     logging::errorf(gateway_tag, "Failed to configure WiFi: %s", esp_err_to_name(err));
     return err;
