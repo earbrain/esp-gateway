@@ -277,38 +277,36 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
         </div>
 
         <form onSubmit={handleSubmit} class="space-y-4">
-          <div class="space-y-3">
-            <div>
-              <p class="text-sm text-slate-600 mb-2">{t("wifi.config.note.scanFirst")}</p>
+          <p class="text-xs text-slate-500 px-1">{t("wifi.config.note.frequency")}</p>
+
+          <div class="form-field">
+            <label for="ssid-input">
+              <span>{t("wifi.config.networkLabel")}</span>
+              <span class="text-sm text-slate-500 ml-2">({t("wifi.config.note.scanFirst")})</span>
+            </label>
+            <div class="flex gap-2">
+              <input
+                id="ssid-input"
+                type="text"
+                class="input flex-1"
+                value={ssid}
+                onInput={(e) => {
+                  setSsid((e.currentTarget as HTMLInputElement).value);
+                  setValidationError(null);
+                }}
+                placeholder={t("wifi.config.networkPlaceholder")}
+                maxLength={32}
+                disabled={isSaving || isConnecting}
+              />
               <button
                 type="button"
-                class="btn-secondary w-full"
+                class="btn-secondary whitespace-nowrap"
                 onClick={handleScan}
                 disabled={isScanning || isSaving || isConnecting}
               >
                 {isScanning ? t("wifi.config.scanning") : t("wifi.config.scan")}
               </button>
             </div>
-            <p class="text-xs text-slate-500 px-1">{t("wifi.config.note.frequency")}</p>
-          </div>
-
-          <div class="form-field">
-            <label for="ssid-input">
-              <span>{t("wifi.config.networkLabel")}</span>
-            </label>
-            <input
-              id="ssid-input"
-              type="text"
-              class="input"
-              value={ssid}
-              onInput={(e) => {
-                setSsid((e.currentTarget as HTMLInputElement).value);
-                setValidationError(null);
-              }}
-              placeholder={t("wifi.config.networkPlaceholder")}
-              maxLength={32}
-              disabled={isSaving || isConnecting}
-            />
           </div>
 
           <div class="form-field">
