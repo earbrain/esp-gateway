@@ -4,5 +4,5 @@ license: MIT
 url: https://github.com/earbrain/esp-gateway
 dependencies:
   earbrain_core:
-    version: "v0.3.1"
+    version: "v0.3.2"
     git: https://github.com/earbrain/esp-core.git

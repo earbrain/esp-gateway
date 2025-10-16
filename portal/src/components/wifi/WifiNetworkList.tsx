@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { FunctionalComponent } from "preact";
 import { useTranslation } from "../../i18n/context";
 import { useApi } from "../../hooks/useApi";
-import type { WifiNetwork, WifiScanResponse, WifiResponse } from "../../types/wifi";
+import type { WifiNetwork, WifiScanResponse, WifiResponse, WifiStatus } from "../../types/wifi";
 import { WifiSignalIndicator } from "./WifiSignalIndicator";
 import { SecurityBadge } from "./SecurityBadge";
 
@@ -32,7 +32,9 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showConnectingDialog, setShowConnectingDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [connectedSsid, setConnectedSsid] = useState("");
 
   const {
     data: scanResult,
@@ -54,6 +56,10 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
     headers: {
       "Content-Type": "application/json",
     },
+  });
+
+  const { execute: checkStatus } = useApi<WifiStatus>("/api/v1/wifi/status", {
+    method: "GET",
   });
 
   const lastScanError = useRef<string | null>(null);
@@ -152,7 +158,6 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
     setSsid(selectedSsid);
     setShowModal(false);
     setValidationError(null);
-    setSuccessMessage(null);
   };
 
   const validateCredentials = useCallback(() => {
@@ -186,35 +191,9 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
     if (!credentials) return;
 
     setValidationError(null);
-    setSuccessMessage(null);
 
     try {
-      const response = await saveCredentials({
-        body: JSON.stringify(credentials),
-      });
-
-      if (response) {
-        setSuccessMessage(t("wifi.config.success.saved", { ssid: credentials.ssid }));
-      } else {
-        setValidationError(t("wifi.config.error.saveFailed"));
-      }
-    } catch (err) {
-      console.error(err);
-      setValidationError(t("wifi.config.error.unexpected"));
-    }
-  }, [validateCredentials, saveCredentials, t]);
-
-  const handleConnectSubmit = useCallback(async (e: Event) => {
-    e.preventDefault();
-
-    const credentials = validateCredentials();
-    if (!credentials) return;
-
-    setValidationError(null);
-    setSuccessMessage(null);
-
-    // First save the credentials
-    try {
+      // First save the credentials
       const saveResponse = await saveCredentials({
         body: JSON.stringify(credentials),
       });
@@ -224,24 +203,65 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
         return;
       }
 
-      // Then connect using saved credentials
+      // Initiate connection (non-blocking)
       const connectResponse = await connectWifi({});
 
-      if (connectResponse) {
-        setSuccessMessage(t("wifi.config.success.connected", { ssid: credentials.ssid }));
-      } else {
+      if (!connectResponse) {
         setValidationError(t("wifi.config.error.connectFailed"));
+        return;
+      }
+
+      // Show connecting dialog
+      setConnectedSsid(credentials.ssid);
+      setShowConnectingDialog(true);
+
+      // Poll status to wait for connection completion
+      const maxAttempts = 30; // 30 seconds max (30 * 1000ms)
+      const pollInterval = 1000; // 1 second
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+        const status = await checkStatus({});
+        if (!status) continue;
+
+        // Connection successful
+        if (status.sta_connected) {
+          setShowConnectingDialog(false);
+          setShowSuccessDialog(true);
+          if (onConnectionComplete) {
+            onConnectionComplete();
+          }
+          return;
+        }
+
+        // Connection failed
+        if (status.sta_error && status.sta_error.length > 0 && !status.sta_connecting) {
+          setShowConnectingDialog(false);
+          setValidationError(t("wifi.config.error.connectFailed") + `: ${status.sta_error}`);
+          if (onConnectionComplete) {
+            onConnectionComplete();
+          }
+          return;
+        }
+      }
+
+      // Timeout
+      setShowConnectingDialog(false);
+      setValidationError(t("wifi.config.error.connectTimeout"));
+      if (onConnectionComplete) {
+        onConnectionComplete();
       }
     } catch (err) {
       console.error(err);
+      setShowConnectingDialog(false);
       setValidationError(t("wifi.config.error.unexpected"));
-    } finally {
-      // Always refresh status after connection attempt (success or failure)
       if (onConnectionComplete) {
         onConnectionComplete();
       }
     }
-  }, [validateCredentials, saveCredentials, connectWifi, onConnectionComplete, t]);
+  }, [validateCredentials, saveCredentials, connectWifi, checkStatus, onConnectionComplete, t]);
+
 
   return (
     <>
@@ -265,7 +285,6 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 onInput={(e) => {
                   setSsid((e.currentTarget as HTMLInputElement).value);
                   setValidationError(null);
-                  setSuccessMessage(null);
                 }}
                 placeholder={t("wifi.config.networkPlaceholder")}
                 maxLength={32}
@@ -295,7 +314,6 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 onInput={(e) => {
                   setPassword((e.currentTarget as HTMLInputElement).value);
                   setValidationError(null);
-                  setSuccessMessage(null);
                 }}
                 placeholder={t("wifi.config.passwordPlaceholder")}
                 maxLength={64}
@@ -324,27 +342,13 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
             </div>
           )}
 
-          {successMessage && (
-            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700" role="status">
-              {successMessage}
-            </div>
-          )}
-
           <div class="flex gap-2">
             <button
               type="submit"
-              class="btn-secondary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isSaving || isConnecting || !ssid.trim()}
-            >
-              {isSaving ? t("wifi.config.saving") : t("wifi.config.save")}
-            </button>
-            <button
-              type="button"
               class="btn-primary flex-1 disabled:bg-sky-300 disabled:cursor-not-allowed"
               disabled={isSaving || isConnecting || !ssid.trim()}
-              onClick={handleConnectSubmit}
             >
-              {isConnecting ? t("wifi.config.connecting") : t("wifi.config.saveAndConnect")}
+              {isConnecting ? t("wifi.config.connecting") : isSaving ? t("wifi.config.saving") : t("wifi.config.save")}
             </button>
           </div>
         </form>
@@ -418,6 +422,53 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 onClick={() => setShowModal(false)}
               >
                 {t("wifi.config.modal.close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Connecting Dialog */}
+      {showConnectingDialog && (
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div class="w-full max-w-sm rounded-3xl border border-slate-200 bg-white shadow-2xl p-6">
+            <div class="text-center">
+              <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center">
+                <span class="inline-block h-12 w-12 animate-spin rounded-full border-4 border-slate-300 border-t-sky-500"></span>
+              </div>
+              <h3 class="text-lg font-semibold text-slate-900 mb-2">
+                {t("wifi.config.dialog.connecting", { ssid: connectedSsid })}
+              </h3>
+              <p class="text-sm text-slate-600">
+                {t("wifi.config.dialog.connectingDescription")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Connection Success Dialog */}
+      {showSuccessDialog && (
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div class="w-full max-w-sm rounded-3xl border border-slate-200 bg-white shadow-2xl p-6">
+            <div class="text-center">
+              <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+                <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold text-slate-900 mb-2">
+                {t("wifi.config.success.connected", { ssid: connectedSsid })}
+              </h3>
+              <p class="text-sm text-slate-600 mb-6">
+                {t("wifi.config.dialog.connectedDescription")}
+              </p>
+              <button
+                type="button"
+                class="btn-primary w-full"
+                onClick={() => setShowSuccessDialog(false)}
+              >
+                {t("common.close")}
               </button>
             </div>
           </div>

@@ -41,6 +41,9 @@ export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refre
         ? t("wifi.status.summary.connectedWithIp", { ip: status.ip })
         : t("wifi.status.summary.connected");
     }
+    if (status.sta_connecting) {
+      return t("wifi.status.summary.connecting");
+    }
     if (status.sta_error && status.sta_error.length > 0) {
       return t("wifi.status.summary.connectionError", { message: status.sta_error });
     }
@@ -88,6 +91,13 @@ export const WifiStatusCard: FunctionalComponent<WifiStatusCardProps> = ({ refre
           ? t("wifi.status.sta.descriptionConnectedWithIp", { ip: status.ip })
           : t("wifi.status.sta.descriptionConnected"),
         badgeClass: "status-pill bg-emerald-100 text-emerald-700",
+      };
+    }
+    if (status.sta_connecting) {
+      return {
+        label: t("wifi.status.sta.connecting"),
+        description: t("wifi.status.sta.descriptionConnecting"),
+        badgeClass: "status-pill bg-sky-100 text-sky-600",
       };
     }
     if (status.sta_error && status.sta_error.length > 0) {

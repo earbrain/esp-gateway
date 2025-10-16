@@ -109,46 +109,28 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
 
   logging::info("Attempting to connect using saved credentials", "gateway");
 
-  // Get saved credentials for event emission
+  // Get saved credentials to check if they exist
   auto saved_creds = earbrain::wifi().load_credentials();
-  WifiCredentials wifi_creds{};
-  if (saved_creds.has_value()) {
-    wifi_creds = saved_creds.value();
+  if (!saved_creds.has_value()) {
+    return http::send_error(req, "No saved credentials found", "ESP_ERR_NOT_FOUND");
   }
 
-  // Use connect_sync for synchronous connection (with 15 second timeout)
-  const esp_err_t result = earbrain::wifi().connect_sync();
-  if (result == ESP_OK) {
-    logging::info("Successfully connected to saved network", "gateway");
-    gateway->emit(Gateway::Event::WifiConnectSuccess, wifi_creds);
-    return http::send_success(req);
-  }
+  const esp_err_t result = earbrain::wifi().connect();
+  if (result != ESP_OK) {
+    logging::errorf("gateway", "Failed to initiate connection: %s", esp_err_to_name(result));
 
-  // Map error codes to user-friendly messages
-  const char* error_msg = "Connection failed";
-  switch (result) {
-    case ESP_ERR_NOT_FOUND:
-      error_msg = "No saved credentials found";
-      break;
-    case ESP_ERR_WIFI_PASSWORD:
-      error_msg = "Authentication failed (wrong password?)";
-      break;
-    case ESP_ERR_WIFI_SSID:
-      error_msg = "Network not found";
-      break;
-    case ESP_ERR_TIMEOUT:
-      error_msg = "Connection timeout";
-      break;
-    case ESP_ERR_INVALID_STATE:
+    const char* error_msg = "Failed to initiate connection";
+    if (result == ESP_ERR_INVALID_STATE) {
       error_msg = "WiFi not in correct mode (APSTA required)";
-      break;
-    default:
-      break;
+    }
+
+    return http::send_error(req, error_msg, esp_err_to_name(result));
   }
 
-  logging::errorf("gateway", "Connection failed: %s", esp_err_to_name(result));
-  gateway->emit(Gateway::Event::WifiConnectFailed, wifi_creds);
-  return http::send_error(req, error_msg, esp_err_to_name(result));
+  logging::info("Connection initiated, check /api/v1/wifi/status for progress", "gateway");
+
+  // Return success immediately - client should poll /api/v1/wifi/status to check connection status
+  return http::send_success(req);
 }
 
 esp_err_t handle_status_get(httpd_req_t *req) {

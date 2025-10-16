@@ -8,6 +8,7 @@ export type WifiStatus = {
   ap_active: boolean;
   sta_active: boolean;
   sta_connected: boolean;
+  sta_connecting: boolean;
   sta_error: string;
   ip: string;
   disconnect_reason: number;
