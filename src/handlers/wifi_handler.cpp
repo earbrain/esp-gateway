@@ -95,9 +95,6 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
 
   logging::info("Wi-Fi credentials saved successfully", "gateway");
 
-  // Emit credentials saved event
-  gateway->emit(Gateway::Event::WifiCredentialsSaved, wifi_creds);
-
   return http::send_success(req);
 }
 
