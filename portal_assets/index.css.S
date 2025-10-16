@@ -1,4 +1,4 @@
-/* * Data converted from /Users/junichi/ghq/github.com/EarEEG-dev/esp-gateway/portal/dist/assets/index.css
+/* * Data converted from /Users/junichi/ghq/github.com/earbrain/esp-gateway/portal/dist/assets/index.css
  * (null byte appended)
  */
 .data

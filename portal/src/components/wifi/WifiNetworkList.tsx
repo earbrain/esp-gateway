@@ -299,6 +299,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 {isScanning ? t("wifi.config.scanning") : t("wifi.config.scan")}
               </button>
             </div>
+            <p class="mt-2 text-xs text-slate-500">{t("wifi.config.note.frequency")}</p>
           </div>
 
           <div class="form-field">
