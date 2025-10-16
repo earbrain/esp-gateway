@@ -417,13 +417,23 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
             </div>
 
             <div class="p-6 pt-4 border-t border-slate-200">
-              <button
-                type="button"
-                class="btn-secondary w-full"
-                onClick={() => setShowModal(false)}
-              >
-                {t("wifi.config.modal.close")}
-              </button>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="btn-primary flex-1"
+                  onClick={handleScan}
+                  disabled={isScanning}
+                >
+                  {isScanning ? t("wifi.config.scanning") : t("wifi.config.scan")}
+                </button>
+                <button
+                  type="button"
+                  class="btn-secondary flex-1"
+                  onClick={() => setShowModal(false)}
+                >
+                  {t("common.close")}
+                </button>
+              </div>
             </div>
           </div>
         </div>
