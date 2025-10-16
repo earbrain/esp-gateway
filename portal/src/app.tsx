@@ -2,7 +2,9 @@ import Router, { route, type RouterOnChangeArgs } from "preact-router";
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
+import { ConnectionLostDialog } from "./components/ConnectionLostDialog";
 import { LanguageSelector } from "./components/LanguageSelector";
+import { useConnectionMonitor } from "./hooks/useConnectionMonitor";
 import { useTranslation } from "./i18n/context";
 import type { TranslationKey } from "./i18n/translations";
 import { HomePage } from "./pages/home";
@@ -99,6 +101,28 @@ export function App() {
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [userDismissed, setUserDismissed] = useState(false);
+
+  // Check for mock mode via query parameter
+  const mockMode = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).has("mock")
+    : false;
+
+  // Monitor connection to gateway
+  const { status, consecutiveFailures, shouldShowDialog } = useConnectionMonitor({
+    endpoint: "/health",
+    intervalMs: 5000,
+    failureThreshold: 5, // Show dialog after 5 consecutive failures (25 seconds)
+    enabled: true,
+    mockMode,
+  });
+
+  // Reset userDismissed when connection is restored
+  useEffect(() => {
+    if (status === "connected") {
+      setUserDismissed(false);
+    }
+  }, [status]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -141,6 +165,11 @@ export function App() {
 
   return (
     <div class="min-h-screen bg-slate-100 text-slate-900">
+      <ConnectionLostDialog
+        isOpen={shouldShowDialog && !userDismissed}
+        consecutiveFailures={consecutiveFailures}
+        onDismiss={() => setUserDismissed(true)}
+      />
       <header class="bg-white/95 shadow-sm">
         <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-4">
           <h1 class="text-xl font-semibold text-slate-900">{t("app.title")}</h1>

@@ -149,6 +149,9 @@ const en = {
   "language.selector.label": "Language",
   "language.option.en": "English",
   "language.option.ja": "日本語",
+  "connection.lost.title": "Connection Lost",
+  "connection.lost.description": "The device is no longer accessible. The connection may have been interrupted or the device may have been disconnected from the network.",
+  "connection.lost.reconnecting": "Attempting to reconnect... ({{count}} failed attempts)",
 } as const;
 
 const ja: typeof en = {
@@ -301,6 +304,9 @@ const ja: typeof en = {
   "language.selector.label": "言語",
   "language.option.en": "English",
   "language.option.ja": "日本語",
+  "connection.lost.title": "接続が切断されました",
+  "connection.lost.description": "デバイスにアクセスできなくなりました。接続が中断されたか、デバイスがネットワークから切断された可能性があります。",
+  "connection.lost.reconnecting": "再接続を試みています... (失敗回数: {{count}})",
 } as const;
 
 export type TranslationKey = keyof typeof en;
