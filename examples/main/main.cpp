@@ -32,24 +32,24 @@ extern "C" void app_main(void) {
   options.mdns_config.instance_name = "ESP Gateway";
   options.portal_config.title = "ESP Gateway Example";
 
-  // Create gateway with options
-  earbrain::Gateway gateway(options);
+  // Initialize gateway singleton with options
+  earbrain::gateway().initialize(options);
 
   // Apply logging middleware globally to all routes
-  gateway.server().use(earbrain::middleware::log_request);
+  earbrain::gateway().server().use(earbrain::middleware::log_request);
 
   // Add custom route with route-specific middleware
   earbrain::RouteOptions hello_opts;
   hello_opts.middlewares = {add_custom_header};
-  if (gateway.add_route("/api/ext/hello", HTTP_GET, &custom_hello_handler, hello_opts) != ESP_OK) {
+  if (earbrain::gateway().add_route("/api/ext/hello", HTTP_GET, &custom_hello_handler, hello_opts) != ESP_OK) {
     earbrain::logging::error("Failed to register /api/ext/hello", TAG);
     return;
   }
 
-  earbrain::logging::infof(TAG, "Gateway version: %s", gateway.version());
+  earbrain::logging::infof(TAG, "Gateway version: %s", earbrain::Gateway::version());
 
   // Start portal (AP + HTTP server + mDNS)
-  if (gateway.start_portal() != ESP_OK) {
+  if (earbrain::gateway().start_portal() != ESP_OK) {
     earbrain::logging::error("Failed to start portal", TAG);
     return;
   }

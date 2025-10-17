@@ -44,13 +44,13 @@ extern "C" void app_main(void) {
   earbrain::GatewayOptions opts;
   opts.ap_config.ssid = "my-device";
 
-  static earbrain::Gateway gateway(opts);
-  if (gateway.start_portal() != ESP_OK) {
+  earbrain::gateway().initialize(opts);
+  if (earbrain::gateway().start_portal() != ESP_OK) {
     earbrain::logging::error("portal start failed", TAG);
     return;
   }
 
-  if (gateway.add_route("/api/custom", HTTP_GET, [](httpd_req_t *req) {
+  if (earbrain::gateway().add_route("/api/custom", HTTP_GET, [](httpd_req_t *req) {
         return httpd_resp_send(req, "ok", HTTPD_RESP_USE_STRLEN);
       }) != ESP_OK) {
     earbrain::logging::error("add_route failed", TAG);

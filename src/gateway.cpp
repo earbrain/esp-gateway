@@ -29,9 +29,9 @@ Gateway::Gateway()
     builtin_routes_registered(false) {
 }
 
-Gateway::Gateway(const GatewayOptions &opts)
-  : options{opts}, http_server{},
-    builtin_routes_registered(false) {
+esp_err_t Gateway::initialize(const GatewayOptions &opts) {
+  options = opts;
+  return ESP_OK;
 }
 
 Gateway::~Gateway() {
@@ -176,6 +176,11 @@ void Gateway::ensure_builtin_routes() {
                      esp_err_to_name(err));
     }
   }
+}
+
+Gateway &gateway() {
+  static Gateway instance;
+  return instance;
 }
 
 } // namespace earbrain

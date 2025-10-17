@@ -23,8 +23,15 @@ struct GatewayOptions {
 class Gateway {
 public:
   Gateway();
-  Gateway(const GatewayOptions &options);
   ~Gateway();
+
+  // Delete copy and move constructors and assignment operators
+  Gateway(const Gateway &) = delete;
+  Gateway &operator=(const Gateway &) = delete;
+  Gateway(Gateway &&) = delete;
+  Gateway &operator=(Gateway &&) = delete;
+
+  esp_err_t initialize(const GatewayOptions &opts);
 
   HttpServer &server() {
     ensure_builtin_routes();
@@ -54,5 +61,7 @@ private:
   HttpServer http_server;
   bool builtin_routes_registered;
 };
+
+Gateway &gateway();
 
 } // namespace earbrain
