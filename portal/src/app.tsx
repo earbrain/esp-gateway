@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
 import { ConnectionLostDialog } from "./components/ConnectionLostDialog";
 import { LanguageSelector } from "./components/LanguageSelector";
+import { useApi } from "./hooks/useApi";
 import { useConnectionMonitor } from "./hooks/useConnectionMonitor";
 import { useTranslation } from "./i18n/context";
 import type { TranslationKey } from "./i18n/translations";
@@ -13,6 +14,7 @@ import { DeviceMetricsPage } from "./pages/device/metrics";
 import { DeviceLogsPage } from "./pages/device/logs";
 import { DeviceMdnsPage } from "./pages/device/mdns";
 import { WifiPage } from "./pages/wifi";
+import type { PortalDetail } from "./types/portal";
 
 type NavItem = {
   path: string;
@@ -102,11 +104,29 @@ export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [userDismissed, setUserDismissed] = useState(false);
+  const [portalTitle, setPortalTitle] = useState<string>(t("app.title"));
 
   // Check for mock mode via query parameter
   const mockMode = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).has("mock")
     : false;
+
+  // Fetch portal details
+  const portalDetail = useApi<PortalDetail>("/api/v1/portal");
+
+  // Load portal detail on mount
+  useEffect(() => {
+    portalDetail.execute();
+  }, []);
+
+  // Update portal title when detail is loaded
+  useEffect(() => {
+    if (portalDetail.data?.title) {
+      setPortalTitle(portalDetail.data.title);
+      // Also update document title
+      document.title = portalDetail.data.title;
+    }
+  }, [portalDetail.data]);
 
   // Monitor connection to gateway
   const { status, consecutiveFailures, shouldShowDialog } = useConnectionMonitor({
@@ -171,7 +191,7 @@ export function App() {
       />
       <header class="bg-white/95 shadow-sm">
         <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-4">
-          <h1 class="text-xl font-semibold text-slate-900">{t("app.title")}</h1>
+          <h1 class="text-xl font-semibold text-slate-900">{portalTitle}</h1>
           <div class="flex items-center gap-3">
             <LanguageSelector />
             <nav class="relative" ref={menuRef}>

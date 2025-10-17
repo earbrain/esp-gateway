@@ -9,6 +9,7 @@
 #include "earbrain/gateway/handlers/metrics_handler.hpp"
 #include "earbrain/gateway/handlers/mdns_handler.hpp"
 #include "earbrain/gateway/handlers/portal_handler.hpp"
+#include "earbrain/gateway/handlers/portal_detail_handler.hpp"
 #include "earbrain/gateway/handlers/wifi_handler.hpp"
 #include "earbrain/logging.hpp"
 
@@ -154,6 +155,7 @@ void Gateway::ensure_builtin_routes() {
       // Health check
       {"/health", HTTP_GET, &handlers::health::handle_health},
       // REST API
+      {"/api/v1/portal", HTTP_GET, &handlers::portal_detail::handle_get},
       {"/api/v1/device", HTTP_GET, &handlers::device::handle_get},
       {"/api/v1/metrics", HTTP_GET, &handlers::metrics::handle_get},
       {"/api/v1/wifi/credentials", HTTP_POST, &handlers::wifi::handle_credentials_post},

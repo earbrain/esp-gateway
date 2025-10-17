@@ -13,6 +13,7 @@ namespace earbrain {
 struct GatewayOptions {
   AccessPointConfig ap_config{"gateway-ap"};
   MdnsConfig mdns_config{"esp-gateway", "ESP Gateway", "_http", "_tcp", 80};
+  const char* portal_title = "ESP Gateway Portal";
 };
 
 class Gateway {
@@ -40,6 +41,10 @@ public:
 #else
     return "unknown";
 #endif
+  }
+
+  const char *get_portal_title() const {
+    return options.portal_title;
   }
 
 private:

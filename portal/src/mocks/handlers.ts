@@ -23,6 +23,17 @@ export const handlers = [
     });
   }),
 
+  // Portal detail
+  http.get("/api/v1/portal", async () => {
+    await delay(100);
+    return HttpResponse.json({
+      status: "success",
+      data: {
+        title: "ESP Gateway Portal",
+      },
+    });
+  }),
+
   // Device information
   http.get("/api/v1/device", async () => {
     await delay(200);
