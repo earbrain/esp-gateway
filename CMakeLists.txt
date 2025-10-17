@@ -18,6 +18,7 @@ idf_component_register(
         "src/handlers/metrics_handler.cpp"
         "src/handlers/mdns_handler.cpp"
         "src/handlers/portal_handler.cpp"
+        "src/handlers/portal_detail_handler.cpp"
         "src/handlers/wifi_handler.cpp"
         "src/http_server.cpp"
         "src/middlewares/logging.cpp"
