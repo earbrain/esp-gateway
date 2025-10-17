@@ -11,7 +11,7 @@
 namespace earbrain {
 
 struct PortalConfig {
-  const char* title = "ESP Gateway Portal";
+  std::string title = "ESP Gateway Portal";
 };
 
 struct GatewayOptions {

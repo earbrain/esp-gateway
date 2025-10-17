@@ -1,11 +1,12 @@
 #pragma once
 
 #include "json/json_helpers.hpp"
+#include <string>
 
 namespace earbrain::json_model {
 
 struct PortalDetail {
-  const char *title;
+  std::string title;
 };
 
 inline json::Ptr to_json(const PortalDetail &detail) {
