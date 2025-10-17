@@ -17,7 +17,7 @@ esp_err_t handle_get(httpd_req_t *req) {
   }
 
   json_model::PortalDetail detail;
-  detail.title = gateway->get_portal_title();
+  detail.title = gateway->options.portal_config.title;
 
   auto data = json_model::to_json(detail);
   if (!data) {

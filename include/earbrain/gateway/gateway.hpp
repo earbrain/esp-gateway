@@ -47,14 +47,10 @@ public:
 #endif
   }
 
-  const char *get_portal_title() const {
-    return options.portal_config.title;
-  }
+  GatewayOptions options;
 
 private:
   void ensure_builtin_routes();
-
-  GatewayOptions options;
   HttpServer http_server;
   bool builtin_routes_registered;
 };
