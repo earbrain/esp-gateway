@@ -30,6 +30,7 @@ extern "C" void app_main(void) {
   options.ap_config.ssid = "gateway-ap";
   options.mdns_config.hostname = "esp-gateway";
   options.mdns_config.instance_name = "ESP Gateway";
+  options.portal_title = "ESP Gateway Example";
 
   // Create gateway with options
   earbrain::Gateway gateway(options);
