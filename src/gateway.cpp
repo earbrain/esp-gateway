@@ -41,17 +41,12 @@ Gateway::~Gateway() {
 
 esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
                              RequestHandler handler, void *user_ctx) {
-  return http_server.add_route(uri, method, handler,
-                               user_ctx ? user_ctx : this);
+  return http_server.add_route(uri, method, handler, user_ctx);
 }
 
 esp_err_t Gateway::add_route(std::string_view uri, httpd_method_t method,
                              RequestHandler handler, const RouteOptions &options) {
-  RouteOptions opts = options;
-  if (!opts.user_ctx) {
-    opts.user_ctx = this;
-  }
-  return http_server.add_route(uri, method, handler, opts);
+  return http_server.add_route(uri, method, handler, options);
 }
 
 esp_err_t Gateway::start_portal() {
@@ -168,7 +163,7 @@ void Gateway::ensure_builtin_routes() {
 
   for (const auto &route : routes_to_register) {
     esp_err_t err = ESP_OK;
-    err = add_route(route.uri, route.method, route.handler, this);
+    err = add_route(route.uri, route.method, route.handler);
 
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
       logging::warnf("gateway", "Failed to register builtin route %.*s: %s",

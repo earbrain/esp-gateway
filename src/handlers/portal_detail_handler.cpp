@@ -11,13 +11,8 @@
 namespace earbrain::handlers::portal_detail {
 
 esp_err_t handle_get(httpd_req_t *req) {
-  auto *gateway = handlers::get_gateway(req);
-  if (!gateway) {
-    return ESP_FAIL;
-  }
-
   json_model::PortalDetail detail;
-  detail.title = gateway->options.portal_config.title;
+  detail.title = gateway().options.portal_config.title;
 
   auto data = json_model::to_json(detail);
   if (!data) {

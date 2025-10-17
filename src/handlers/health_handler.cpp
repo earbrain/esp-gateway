@@ -8,10 +8,6 @@
 namespace earbrain::handlers::health {
 
 esp_err_t handle_health(httpd_req_t *req) {
-  auto *gateway = handlers::get_gateway(req);
-  if (!gateway) {
-    return ESP_FAIL;
-  }
 
   auto data = json::object();
   if (!data) {
@@ -30,7 +26,7 @@ esp_err_t handle_health(httpd_req_t *req) {
   }
 
   // Version
-  if (json::add(data.get(), "version", gateway->version()) != ESP_OK) {
+  if (json::add(data.get(), "version", gateway().version()) != ESP_OK) {
     return ESP_ERR_NO_MEM;
   }
 

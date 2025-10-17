@@ -30,11 +30,6 @@ constexpr std::size_t max_request_body_size = 1024;
 } // namespace
 
 esp_err_t handle_credentials_post(httpd_req_t *req) {
-  auto *gateway = handlers::get_gateway(req);
-  if (!gateway) {
-    return ESP_FAIL;
-  }
-
   if (req->content_len <= 0 ||
       static_cast<std::size_t>(req->content_len) > max_request_body_size) {
     return http::send_fail(req, "Invalid request size.");
@@ -99,11 +94,6 @@ esp_err_t handle_credentials_post(httpd_req_t *req) {
 }
 
 esp_err_t handle_connect_post(httpd_req_t *req) {
-  auto *gateway = handlers::get_gateway(req);
-  if (!gateway) {
-    return ESP_FAIL;
-  }
-
   logging::info("Attempting to connect using saved credentials", "gateway");
 
   // Get saved credentials to check if they exist
@@ -131,11 +121,6 @@ esp_err_t handle_connect_post(httpd_req_t *req) {
 }
 
 esp_err_t handle_status_get(httpd_req_t *req) {
-  auto *gateway = handlers::get_gateway(req);
-  if (!gateway) {
-    return ESP_FAIL;
-  }
-
   earbrain::WifiStatus wifi_status = earbrain::wifi().status();
 
   json_model::WifiStatus status;
@@ -162,11 +147,6 @@ esp_err_t handle_status_get(httpd_req_t *req) {
 }
 
 esp_err_t handle_scan_get(httpd_req_t *req) {
-  auto *gateway = handlers::get_gateway(req);
-  if (!gateway) {
-    return ESP_FAIL;
-  }
-
   WifiScanResult result = earbrain::wifi().perform_scan();
 
   if (result.error != ESP_OK) {

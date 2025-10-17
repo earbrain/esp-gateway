@@ -4,16 +4,12 @@ namespace earbrain {
 
 namespace {
 
+// Middleware wrapper
 esp_err_t middleware_wrapper(httpd_req_t *req) {
   auto *route = static_cast<UriHandler *>(req->user_ctx);
   if (!route) {
     return ESP_FAIL;
   }
-
-  // Create request context
-  RequestContext ctx;
-  ctx.gateway = static_cast<Gateway *>(route->user_ctx);
-  req->user_ctx = &ctx;
 
   // Build the handler chain
   NextHandler next = [route](httpd_req_t *r) {
@@ -39,8 +35,8 @@ esp_err_t middleware_wrapper(httpd_req_t *req) {
     }
   }
 
-  // Execute the chain - ctx must stay in scope during this call
-  esp_err_t result = next(req);
+  // Execute the chain
+  const esp_err_t result = next(req);
   return result;
 }
 
@@ -71,10 +67,10 @@ void UriHandler::refresh_descriptor() {
 
   if (has_middlewares) {
     descriptor.handler = &middleware_wrapper;
-    descriptor.user_ctx = this;
+    descriptor.user_ctx = this;  // Pass UriHandler* to wrapper
   } else {
     descriptor.handler = handler;
-    descriptor.user_ctx = user_ctx;
+    descriptor.user_ctx = user_ctx;  // Available for future use
   }
 }
 
@@ -211,11 +207,6 @@ void HttpServer::use(Middleware middleware) {
       route->refresh_descriptor();
     }
   }
-}
-
-// Helper function for request context
-RequestContext *get_request_context(httpd_req_t *req) {
-  return static_cast<RequestContext *>(req->user_ctx);
 }
 
 } // namespace earbrain

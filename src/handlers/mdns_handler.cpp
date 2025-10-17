@@ -11,11 +11,6 @@
 namespace earbrain::handlers::mdns {
 
 esp_err_t handle_get(httpd_req_t *req) {
-  auto *gateway = handlers::get_gateway(req);
-  if (!gateway) {
-    return ESP_FAIL;
-  }
-
   auto data = json::object();
   if (!data) {
     return ESP_ERR_NO_MEM;

@@ -8,24 +8,6 @@
 
 namespace earbrain::handlers {
 
-inline Gateway *get_gateway(httpd_req_t *req) {
-  if (!req) {
-    return nullptr;
-  }
-
-  if (auto *ctx = earbrain::get_request_context(req)) {
-    if (ctx->gateway) {
-      return ctx->gateway;
-    }
-  }
-
-  auto *gateway = static_cast<Gateway *>(req->user_ctx);
-  if (!gateway) {
-    http::send_error(req, "Gateway unavailable", "gateway_unavailable");
-  }
-  return gateway;
-}
-
 inline std::string get_connection_type(httpd_req_t *req, Gateway *gateway) {
   if (!req || !gateway) {
     return "unknown";
