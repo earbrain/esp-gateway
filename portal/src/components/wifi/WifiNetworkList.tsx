@@ -274,8 +274,18 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
           (!status.sta_connecting && status.disconnect_reason !== 0);
         if (hasFailed) {
           setShowConnectingDialog(false);
-          const reason = status.sta_error || t("wifi.config.error.connectFailed");
-          setValidationError(reason);
+          // Map known ESP32 disconnect_reason codes to localized messages.
+          // 2 = WIFI_REASON_AUTH_FAIL, 15 = WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT (wrong WPA password)
+          // 201 = WIFI_REASON_NO_AP_FOUND
+          let errorMessage: string;
+          if (status.disconnect_reason === 2 || status.disconnect_reason === 15) {
+            errorMessage = t("wifi.config.error.wrongPassword");
+          } else if (status.disconnect_reason === 201) {
+            errorMessage = t("wifi.config.error.ssidNotFound");
+          } else {
+            errorMessage = t("wifi.config.error.connectFailed");
+          }
+          setValidationError(errorMessage);
           if (onConnectionComplete) {
             onConnectionComplete();
           }
