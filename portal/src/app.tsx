@@ -6,7 +6,6 @@ import { ConnectionLostDialog } from "./components/ConnectionLostDialog";
 import { LanguageSelector } from "./components/LanguageSelector";
 import { Toast } from "./components/Toast";
 import { WifiNetworkList } from "./components/wifi/WifiNetworkList";
-import { WifiStatusCard } from "./components/WifiStatusCard";
 import { useApi } from "./hooks/useApi";
 import { useConnectionMonitor } from "./hooks/useConnectionMonitor";
 import { useTranslation } from "./i18n/context";
@@ -111,7 +110,6 @@ export function App() {
 
   const [portalTitle, setPortalTitle] = useState<string>(t("app.title"));
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [statusRefresh, setStatusRefresh] = useState(0);
 
   const portalDetail = useApi<PortalDetail>("/api/v1/portal");
 
@@ -128,10 +126,6 @@ export function App() {
 
   const handleError = useCallback((message: string) => {
     setToast({ type: "error", message });
-  }, []);
-
-  const handleConnectionComplete = useCallback(() => {
-    setStatusRefresh((prev) => prev + 1);
   }, []);
 
   // --- save_only mode: SSID/password form only, no scan, no status card ---
@@ -171,9 +165,8 @@ export function App() {
             <LanguageSelector />
           </div>
         </header>
-        <main class="mx-auto w-full max-w-4xl space-y-6 px-4 py-8">
-          <WifiStatusCard refresh={statusRefresh} />
-          <WifiNetworkList onError={handleError} onConnectionComplete={handleConnectionComplete} />
+        <main class="mx-auto w-full max-w-4xl px-4 py-8">
+          <WifiNetworkList onError={handleError} />
         </main>
       </div>
     );
