@@ -1,4 +1,4 @@
-/* * Data converted from /Users/junichi/ghq/github.com/earbrain/esp-gateway/portal/dist/index.html
+/* * Data converted from /Users/ky/dev/clocky/clocky_platformio/components/esp_gateway/portal/dist/index.html
  * (null byte appended)
  */
 .data

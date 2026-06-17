@@ -25,6 +25,9 @@ const isHexKey = (value: string) => /^[0-9a-fA-F]+$/.test(value);
 
 export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onError, onConnectionComplete }) => {
   const t = useTranslation();
+  const saveOnly = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).has("save_only")
+    : false;
   const [networks, setNetworks] = useState<WifiNetwork[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -34,6 +37,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showConnectingDialog, setShowConnectingDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showRemoteSavedDialog, setShowRemoteSavedDialog] = useState(false);
   const [connectedSsid, setConnectedSsid] = useState("");
 
   const {
@@ -198,13 +202,20 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
     setValidationError(null);
 
     try {
-      // First save the credentials
+      // Save credentials to NVS
       const saveResponse = await saveCredentials({
         body: JSON.stringify(credentials),
       });
 
       if (!saveResponse) {
         setValidationError(t("wifi.config.error.saveFailed"));
+        return;
+      }
+
+      // Remote setup mode: save only, skip connection attempt
+      if (saveOnly) {
+        setConnectedSsid(credentials.ssid);
+        setShowRemoteSavedDialog(true);
         return;
       }
 
@@ -265,7 +276,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
         onConnectionComplete();
       }
     }
-  }, [validateCredentials, saveCredentials, connectWifi, checkStatus, onConnectionComplete, t]);
+  }, [saveOnly, validateCredentials, saveCredentials, connectWifi, checkStatus, onConnectionComplete, t]);
 
 
   return (
@@ -487,6 +498,34 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 type="button"
                 class="btn-primary w-full"
                 onClick={() => setShowSuccessDialog(false)}
+              >
+                {t("common.close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remote Setup: Saved Dialog (save_only mode) */}
+      {showRemoteSavedDialog && (
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div class="w-full max-w-sm rounded-3xl border border-slate-200 bg-white shadow-2xl p-6">
+            <div class="text-center">
+              <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+                <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold text-slate-900 mb-2">
+                {t("wifi.config.remote.savedTitle")}
+              </h3>
+              <p class="text-sm text-slate-600 mb-6">
+                {t("wifi.config.remote.savedDescription", { ssid: connectedSsid })}
+              </p>
+              <button
+                type="button"
+                class="btn-primary w-full"
+                onClick={() => setShowRemoteSavedDialog(false)}
               >
                 {t("common.close")}
               </button>
