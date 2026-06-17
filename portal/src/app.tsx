@@ -6,6 +6,7 @@ import { ConnectionLostDialog } from "./components/ConnectionLostDialog";
 import { LanguageSelector } from "./components/LanguageSelector";
 import { Toast } from "./components/Toast";
 import { WifiNetworkList } from "./components/wifi/WifiNetworkList";
+import { WifiStatusCard } from "./components/WifiStatusCard";
 import { useApi } from "./hooks/useApi";
 import { useConnectionMonitor } from "./hooks/useConnectionMonitor";
 import { useTranslation } from "./i18n/context";
@@ -100,48 +101,110 @@ const defaultMeta: PageMeta = {
 
 export function App() {
   const t = useTranslation();
+
+  const searchParams = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+  const mockMode = searchParams.has("mock");
+  const saveOnly = searchParams.has("save_only");
+  const debugMode = searchParams.has("debug");
+
+  const [portalTitle, setPortalTitle] = useState<string>(t("app.title"));
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [statusRefresh, setStatusRefresh] = useState(0);
+
+  const portalDetail = useApi<PortalDetail>("/api/v1/portal");
+
+  useEffect(() => {
+    portalDetail.execute();
+  }, []);
+
+  useEffect(() => {
+    if (portalDetail.data?.title) {
+      setPortalTitle(portalDetail.data.title);
+      document.title = portalDetail.data.title;
+    }
+  }, [portalDetail.data]);
+
+  const handleError = useCallback((message: string) => {
+    setToast({ type: "error", message });
+  }, []);
+
+  const handleConnectionComplete = useCallback(() => {
+    setStatusRefresh((prev) => prev + 1);
+  }, []);
+
+  // --- save_only mode: SSID/password form only, no scan, no status card ---
+  if (saveOnly) {
+    return (
+      <div class="min-h-screen bg-slate-100 text-slate-900">
+        {toast && (
+          <div class="fixed inset-x-0 top-4 z-40 flex justify-center px-4" role="status" aria-live="polite">
+            <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+          </div>
+        )}
+        <header class="bg-white/95 shadow-sm">
+          <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-4">
+            <h1 class="text-xl font-semibold text-slate-900">{portalTitle}</h1>
+            <LanguageSelector />
+          </div>
+        </header>
+        <main class="mx-auto w-full max-w-4xl px-4 py-8">
+          <WifiNetworkList onError={handleError} />
+        </main>
+      </div>
+    );
+  }
+
+  // --- default (user) mode: Wi-Fi status card + scan + credential form ---
+  if (!debugMode) {
+    return (
+      <div class="min-h-screen bg-slate-100 text-slate-900">
+        {toast && (
+          <div class="fixed inset-x-0 top-4 z-40 flex justify-center px-4" role="status" aria-live="polite">
+            <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+          </div>
+        )}
+        <header class="bg-white/95 shadow-sm">
+          <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-4">
+            <h1 class="text-xl font-semibold text-slate-900">{portalTitle}</h1>
+            <LanguageSelector />
+          </div>
+        </header>
+        <main class="mx-auto w-full max-w-4xl space-y-6 px-4 py-8">
+          <WifiStatusCard refresh={statusRefresh} />
+          <WifiNetworkList onError={handleError} onConnectionComplete={handleConnectionComplete} />
+        </main>
+      </div>
+    );
+  }
+
+  // --- debug mode (?debug=1): full portal with nav and all pages ---
+  return <DebugApp mockMode={mockMode} portalTitle={portalTitle} />;
+}
+
+type DebugAppProps = {
+  mockMode: boolean;
+  portalTitle: string;
+};
+
+function DebugApp({ mockMode, portalTitle }: DebugAppProps) {
+  const t = useTranslation();
   const [currentUrl, setCurrentUrl] = useState<string>(() =>
     typeof window !== "undefined" ? window.location.pathname : "/",
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [userDismissed, setUserDismissed] = useState(false);
-  const [portalTitle, setPortalTitle] = useState<string>(t("app.title"));
 
-  // Check for query parameters
-  const searchParams = typeof window !== "undefined"
-    ? new URLSearchParams(window.location.search)
-    : new URLSearchParams();
-  const mockMode = searchParams.has("mock");
-  const saveOnly = searchParams.has("save_only");
-
-  // Fetch portal details
-  const portalDetail = useApi<PortalDetail>("/api/v1/portal");
-
-  // Load portal detail on mount
-  useEffect(() => {
-    portalDetail.execute();
-  }, []);
-
-  // Update portal title when detail is loaded
-  useEffect(() => {
-    if (portalDetail.data?.title) {
-      setPortalTitle(portalDetail.data.title);
-      // Also update document title
-      document.title = portalDetail.data.title;
-    }
-  }, [portalDetail.data]);
-
-  // Monitor connection to gateway
-  const { status, consecutiveFailures, shouldShowDialog } = useConnectionMonitor({
+  const { status, shouldShowDialog } = useConnectionMonitor({
     endpoint: "/health",
     intervalMs: 10000,
-    failureThreshold: 2, // Show dialog after 2 consecutive failures (20 seconds)
+    failureThreshold: 2,
     enabled: true,
     mockMode,
   });
 
-  // Reset userDismissed when connection is restored
   useEffect(() => {
     if (status === "connected") {
       setUserDismissed(false);
@@ -158,16 +221,11 @@ export function App() {
         setMenuOpen(false);
       }
     };
-
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
+      if (event.key === "Escape") setMenuOpen(false);
     };
-
     document.addEventListener("click", handleClick);
     document.addEventListener("keydown", handleKeyDown);
-
     return () => {
       document.removeEventListener("click", handleClick);
       document.removeEventListener("keydown", handleKeyDown);
@@ -186,33 +244,6 @@ export function App() {
 
   const normalizedUrl = normalizeUrl(currentUrl);
   const pageMeta = pageMetaMap[normalizedUrl] ?? defaultMeta;
-
-  const [saveOnlyToast, setSaveOnlyToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const handleSaveOnlyError = useCallback((message: string) => {
-    setSaveOnlyToast({ type: "error", message });
-  }, []);
-
-  // save_only mode: minimal layout showing only the Wi-Fi credential form
-  if (saveOnly) {
-    return (
-      <div class="min-h-screen bg-slate-100 text-slate-900">
-        {saveOnlyToast && (
-          <div class="fixed inset-x-0 top-4 z-40 flex justify-center px-4" role="status" aria-live="polite">
-            <Toast message={saveOnlyToast.message} type={saveOnlyToast.type} onClose={() => setSaveOnlyToast(null)} />
-          </div>
-        )}
-        <header class="bg-white/95 shadow-sm">
-          <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-4">
-            <h1 class="text-xl font-semibold text-slate-900">{portalTitle}</h1>
-            <LanguageSelector />
-          </div>
-        </header>
-        <main class="mx-auto w-full max-w-4xl px-4 py-8">
-          <WifiNetworkList onError={handleSaveOnlyError} />
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div class="min-h-screen bg-slate-100 text-slate-900">
