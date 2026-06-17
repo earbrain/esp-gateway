@@ -231,15 +231,32 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
       setConnectedSsid(credentials.ssid);
       setShowConnectingDialog(true);
 
-      // Poll status to wait for connection completion
-      const maxAttempts = 30; // 30 seconds max (30 * 1000ms)
-      const pollInterval = 1000; // 1 second
+      // Poll status to wait for connection completion.
+      // Note: In APSTA mode, ESP32's AP channel follows the STA channel when
+      // connecting to the router. This can briefly disconnect the phone from
+      // the Mia AP. Track consecutive null responses to detect this case and
+      // surface an error instead of waiting for the full timeout.
+      const maxAttempts = 12; // 12 seconds max
+      const pollInterval = 1000;
+      const maxConsecutiveNulls = 5;
+      let consecutiveNulls = 0;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
         const status = await checkStatus({});
-        if (!status) continue;
+        if (!status) {
+          consecutiveNulls++;
+          if (consecutiveNulls >= maxConsecutiveNulls) {
+            // Phone likely disconnected from Mia AP due to channel change.
+            setShowConnectingDialog(false);
+            setValidationError(t("wifi.config.error.apDisconnected"));
+            if (onConnectionComplete) onConnectionComplete();
+            return;
+          }
+          continue;
+        }
+        consecutiveNulls = 0;
 
         // Connection successful
         if (status.sta_connected) {
@@ -251,10 +268,14 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
           return;
         }
 
-        // Connection failed
-        if (status.sta_error && status.sta_error.length > 0 && !status.sta_connecting) {
+        // Connection failed — sta_error message or non-zero disconnect_reason
+        const hasFailed =
+          (status.sta_error && status.sta_error.length > 0 && !status.sta_connecting) ||
+          (!status.sta_connecting && status.disconnect_reason !== 0);
+        if (hasFailed) {
           setShowConnectingDialog(false);
-          setValidationError(t("wifi.config.error.connectFailed") + `: ${status.sta_error}`);
+          const reason = status.sta_error || t("wifi.config.error.connectFailed");
+          setValidationError(reason);
           if (onConnectionComplete) {
             onConnectionComplete();
           }
