@@ -284,7 +284,9 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
       <div class="card">
         <div class="mb-5">
           <h2 class="section-title !mb-1">{t("wifi.config.title")}</h2>
-          <p class="text-sm text-slate-500">{t("wifi.config.description")}</p>
+          <p class="text-sm text-slate-500">
+            {saveOnly ? t("wifi.config.description.saveOnly") : t("wifi.config.description")}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} class="space-y-4">
@@ -293,7 +295,9 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
           <div class="form-field">
             <label for="ssid-input">
               <span>{t("wifi.config.networkLabel")}</span>
-              <span class="text-sm text-slate-500 ml-2">({t("wifi.config.note.scanFirst")})</span>
+              {!saveOnly && (
+                <span class="text-sm text-slate-500 ml-2">({t("wifi.config.note.scanFirst")})</span>
+              )}
             </label>
             <div class="flex gap-2">
               <input
@@ -309,14 +313,16 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 maxLength={32}
                 disabled={isSaving || isConnecting}
               />
-              <button
-                type="button"
-                class="btn-secondary whitespace-nowrap"
-                onClick={handleScan}
-                disabled={isScanning || isSaving || isConnecting}
-              >
-                {isScanning ? t("wifi.config.scanning") : t("wifi.config.scan")}
-              </button>
+              {!saveOnly && (
+                <button
+                  type="button"
+                  class="btn-secondary whitespace-nowrap"
+                  onClick={handleScan}
+                  disabled={isScanning || isSaving || isConnecting}
+                >
+                  {isScanning ? t("wifi.config.scanning") : t("wifi.config.scan")}
+                </button>
+              )}
             </div>
           </div>
 
@@ -373,8 +379,8 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
         </form>
       </div>
 
-      {/* Scan Results Modal */}
-      {showModal && (
+      {/* Scan Results Modal (not shown in save_only mode) */}
+      {!saveOnly && showModal && (
         <div class="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/40 px-4 pb-4">
           <button
             type="button"

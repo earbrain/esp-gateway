@@ -1,9 +1,11 @@
 import Router, { route, type RouterOnChangeArgs } from "preact-router";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
 import { BreadcrumbSection, type PageMeta } from "./components/BreadcrumbSection";
 import { ConnectionLostDialog } from "./components/ConnectionLostDialog";
 import { LanguageSelector } from "./components/LanguageSelector";
+import { Toast } from "./components/Toast";
+import { WifiNetworkList } from "./components/wifi/WifiNetworkList";
 import { useApi } from "./hooks/useApi";
 import { useConnectionMonitor } from "./hooks/useConnectionMonitor";
 import { useTranslation } from "./i18n/context";
@@ -106,10 +108,12 @@ export function App() {
   const [userDismissed, setUserDismissed] = useState(false);
   const [portalTitle, setPortalTitle] = useState<string>(t("app.title"));
 
-  // Check for mock mode via query parameter
-  const mockMode = typeof window !== "undefined"
-    ? new URLSearchParams(window.location.search).has("mock")
-    : false;
+  // Check for query parameters
+  const searchParams = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+  const mockMode = searchParams.has("mock");
+  const saveOnly = searchParams.has("save_only");
 
   // Fetch portal details
   const portalDetail = useApi<PortalDetail>("/api/v1/portal");
@@ -182,6 +186,33 @@ export function App() {
 
   const normalizedUrl = normalizeUrl(currentUrl);
   const pageMeta = pageMetaMap[normalizedUrl] ?? defaultMeta;
+
+  const [saveOnlyToast, setSaveOnlyToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const handleSaveOnlyError = useCallback((message: string) => {
+    setSaveOnlyToast({ type: "error", message });
+  }, []);
+
+  // save_only mode: minimal layout showing only the Wi-Fi credential form
+  if (saveOnly) {
+    return (
+      <div class="min-h-screen bg-slate-100 text-slate-900">
+        {saveOnlyToast && (
+          <div class="fixed inset-x-0 top-4 z-40 flex justify-center px-4" role="status" aria-live="polite">
+            <Toast message={saveOnlyToast.message} type={saveOnlyToast.type} onClose={() => setSaveOnlyToast(null)} />
+          </div>
+        )}
+        <header class="bg-white/95 shadow-sm">
+          <div class="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-4">
+            <h1 class="text-xl font-semibold text-slate-900">{portalTitle}</h1>
+            <LanguageSelector />
+          </div>
+        </header>
+        <main class="mx-auto w-full max-w-4xl px-4 py-8">
+          <WifiNetworkList onError={handleSaveOnlyError} />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div class="min-h-screen bg-slate-100 text-slate-900">

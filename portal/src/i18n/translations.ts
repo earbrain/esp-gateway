@@ -102,6 +102,7 @@ const en = {
   "wifi.status.fields.lastError": "Last Error",
   "wifi.config.title": "Wi-Fi Configuration",
   "wifi.config.description": "Enter your Wi-Fi credentials or scan for nearby networks.",
+  "wifi.config.description.saveOnly": "Enter the Wi-Fi name (SSID) and password for the destination. MIA will connect automatically when it arrives.",
   "wifi.config.note.scanFirst": "Scan for nearby networks",
   "wifi.config.networkLabel": "Network (SSID)",
   "wifi.config.networkPlaceholder": "Enter SSID",
@@ -258,6 +259,7 @@ const ja: typeof en = {
   "wifi.status.fields.disconnectReason": "切断理由",
   "wifi.status.fields.lastError": "最後のエラー",
   "wifi.config.title": "Wi-Fi 設定",
+  "wifi.config.description.saveOnly": "送り先のWi-Fi名（SSID）とパスワードを入力してください。MIAをお届けすると自動でWi-Fiに接続されます。",
   "wifi.config.description":
     "Wi-Fi 認証情報を入力するか、近くのネットワークをスキャンしてください。",
   "wifi.config.note.scanFirst": "近くのネットワークをスキャン",
