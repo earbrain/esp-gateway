@@ -46,6 +46,11 @@ public:
   esp_err_t start_portal();
   esp_err_t stop_portal();
 
+  // ポータルの HTTP サーバー・mDNS・SoftAP を停止するが、確立済みの STA 接続は
+  // 維持する（wifi().stop_ap() を使用）。ポータル経由で WiFi 設定が完了し STA が
+  // 接続済みの状態で、接続を切らずに通常モードへ移行するためのクリーンアップ用。
+  esp_err_t stop_portal_keep_sta();
+
   static const char *version() {
 #ifdef GATEWAY_VERSION
     return GATEWAY_VERSION;

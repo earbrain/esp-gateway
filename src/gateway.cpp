@@ -122,6 +122,31 @@ esp_err_t Gateway::stop_portal() {
   return ESP_OK;
 }
 
+esp_err_t Gateway::stop_portal_keep_sta() {
+  esp_err_t mdns_err = earbrain::mdns().stop();
+  if (mdns_err != ESP_OK) {
+    logging::warnf(gateway_tag, "Failed to stop mDNS service: %s", esp_err_to_name(mdns_err));
+  }
+
+  esp_err_t http_err = http_server.stop();
+  if (http_err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to stop HTTP server: %s", esp_err_to_name(http_err));
+  }
+
+  // STA 接続を維持したまま SoftAP のみ停止する（wifi().mode(Off) は呼ばない）
+  esp_err_t ap_err = earbrain::wifi().stop_ap();
+  if (ap_err != ESP_OK) {
+    logging::errorf(gateway_tag, "Failed to stop SoftAP: %s", esp_err_to_name(ap_err));
+  }
+
+  if (http_err != ESP_OK || ap_err != ESP_OK) {
+    return ESP_FAIL;
+  }
+
+  logging::info("Portal stopped (STA connection preserved)", gateway_tag);
+  return ESP_OK;
+}
+
 void Gateway::ensure_builtin_routes() {
   if (builtin_routes_registered) {
     return;
