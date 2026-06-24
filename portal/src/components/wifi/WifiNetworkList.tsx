@@ -404,7 +404,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
               class="btn-primary flex-1 disabled:bg-sky-300 disabled:cursor-not-allowed"
               disabled={isSaving || isConnecting || !ssid.trim()}
             >
-              {isConnecting ? t("wifi.config.connecting") : isSaving ? t("wifi.config.saving") : t("wifi.config.save")}
+              {isConnecting ? t("wifi.config.connecting") : isSaving ? t("wifi.config.saving") : saveOnly ? t("wifi.config.save") : t("wifi.config.connect")}
             </button>
           </div>
         </form>
@@ -534,7 +534,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
               <button
                 type="button"
                 class="btn-primary w-full"
-                onClick={() => setShowSuccessDialog(false)}
+                onClick={() => { window.location.href = 'mia://wifi-connected'; }}
               >
                 {t("common.close")}
               </button>
@@ -562,7 +562,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
               <button
                 type="button"
                 class="btn-primary w-full"
-                onClick={() => setShowRemoteSavedDialog(false)}
+                onClick={() => { window.location.href = 'mia://wifi-saved'; }}
               >
                 {t("common.close")}
               </button>
