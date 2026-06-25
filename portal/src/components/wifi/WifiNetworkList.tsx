@@ -427,6 +427,7 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
                 <div class="flex-1">
                   <h3 class="text-lg font-semibold text-slate-900">{t("wifi.config.modal.title")}</h3>
                   <p class="mt-1 text-sm text-slate-500">{t("wifi.config.modal.description")}</p>
+                  <p class="mt-1 text-xs text-slate-400">{t("wifi.config.modal.scanRetryHint")}</p>
                 </div>
                 <button
                   type="button"
@@ -562,7 +563,10 @@ export const WifiNetworkList: FunctionalComponent<WifiNetworkListProps> = ({ onE
               <button
                 type="button"
                 class="btn-primary w-full"
-                onClick={() => { window.location.href = 'mia://wifi-saved'; }}
+                onClick={async () => {
+                  try { await fetch('/api/v1/portal/stop', { method: 'POST' }); } catch (_) {}
+                  window.location.href = 'mia://wifi-saved';
+                }}
               >
                 {t("common.close")}
               </button>
